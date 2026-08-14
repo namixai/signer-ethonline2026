@@ -1,0 +1,300 @@
+{
+  "about": "Permit2 EIP-712 test vectors. Inputs only; the expected digests in permit2-vectors.json are derived from this file by verify_ours.py --emit and cross-checked by verify_sdk.mjs.",
+  "permit2Address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "note_spender": "For AllowanceTransfer, `spender` is a field of the signed struct and lives inside `message`. For SignatureTransfer it is NOT a struct field: PermitHash.hash() substitutes msg.sender, so it lives at case level. That asymmetry is the contract's, not ours.",
+  "cases": [
+    {
+      "id": "allowance-single-mainnet-regression",
+      "why": "Byte-for-byte the vector published in SPEC-permit2-eip712 on 2026-08-05. If this one ever moves, either the old spec or this file is wrong.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "2000000000",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      },
+      "expected": {
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "hashPermitDetails": "0x665449c71b4a0866197bdf385920f206dbc3e9b2de768e8579a480105bb5d16a",
+        "hashStruct": "0x5c95ac3857991257e81acf69af4cd1911a4adf071f8496a6ad320dc666ecf746",
+        "digest": "0x1ef7d06d76cfa91f98a4ced55bacca4066b5fc35c0f507fdd8437dadaad18eea"
+      }
+    },
+    {
+      "id": "allowance-single-infinite-amount",
+      "why": "amount = type(uint160).max. AllowanceTransfer._transfer skips the decrement entirely at this value, so the allowance never depletes. The policy refuses this one.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1461501637330902918203684832716283019655932542975",
+          "expiration": "2000000000",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      },
+      "expected": {
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "hashPermitDetails": "0x863ba0bb1cad1b3c68356ee0a2e6b9cdd734c324b65b7dc56a7a37b541b33da4",
+        "hashStruct": "0x77f16ac7b3d65d421c8a582b03a60c8d56979b43ba15fd7c2ed4cc99ecef0b32",
+        "digest": "0xa7fd12262b0fbbe385086c7ecd54520f27bd038ebce83bde62875130f8a5c637"
+      }
+    },
+    {
+      "id": "allowance-single-expiration-zero-is-safe",
+      "why": "expiration = 0 is the SAFEST value, not the most dangerous: Allowance.updateAll stores uint48(block.timestamp), so the approval dies in the block that set it. A policy that rejects 0 is broken, not strict.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "0",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      },
+      "expected": {
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "hashPermitDetails": "0x2f353336a2eae59ae48638af64d36496f7e39c8864041aaacc3ef2b8716b0234",
+        "hashStruct": "0x2bc9b4db430d379fc1b3c140db4c024bfbf32437333e3d5c5b36f5baf5d9e73c",
+        "digest": "0xae7d8a0f49cf7ff246a1ca4ddbf55e93b6a4ca5e04df296a85592371dad10b23"
+      }
+    },
+    {
+      "id": "allowance-single-uint48-max-expiration",
+      "why": "expiration = type(uint48).max (year 8921921). Not infinite by the contract's own test, but infinite in practice — the case an absolute ceiling in policy has to catch.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "281474976710655",
+          "nonce": "65535"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "expected": {
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "hashPermitDetails": "0xeca2483981b5b474c18e96a8e417e94301ec272304493ab93fcb0958cdb81ca1",
+        "hashStruct": "0xb2b12ca890a8804dd4de3b6cbf92296e0bf911a7e313c1abc530d1db182b5f65",
+        "digest": "0x7fe2eb6d52253f4b1e775ec2109cbc172910d890f38147d1c02ee8f2c58c6c1f"
+      }
+    },
+    {
+      "id": "allowance-single-base-universalrouter",
+      "why": "Same shape on Base. Only chainId changed, and the digest is completely different — the domain separator carries it.",
+      "kind": "PermitSingle",
+      "chainId": 8453,
+      "message": {
+        "details": {
+          "token": "0x4200000000000000000000000000000000000006",
+          "amount": "1000000000000000000",
+          "expiration": "1767225600",
+          "nonce": "0"
+        },
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "sigDeadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashPermitDetails": "0x4565e2d205b05b3469a900689259840c46a4aeaedcf608659f1fe072f75b9264",
+        "hashStruct": "0x4b20a88d40ea729173f98d3a28e95d1d8e8813785308633aa3bd7452485152c8",
+        "digest": "0xef39d09e3f775a9bc4635138fbd18583809aab3ee946b6a87169cd4ce1c6b075"
+      }
+    },
+    {
+      "id": "allowance-batch-two-tokens-base",
+      "why": "PermitDetails[] enters as keccak of the concatenated member hashes, not as the members inline.",
+      "kind": "PermitBatch",
+      "chainId": 8453,
+      "message": {
+        "details": [
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "1000000000000000000",
+            "expiration": "1767225600",
+            "nonce": "0"
+          },
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000",
+            "expiration": "1767225600",
+            "nonce": "3"
+          }
+        ],
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "sigDeadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashPermitDetails": [
+          "0x4565e2d205b05b3469a900689259840c46a4aeaedcf608659f1fe072f75b9264",
+          "0xfda26618f3d052bfdc4a1e1f5c3d9d0d08a665689b5b2989a205ba6dfc477d73"
+        ],
+        "hashStruct": "0x956c30f97ff509f5ff7d325433c3348dac1d8f7ce8743603b2c3982d98d4b464",
+        "digest": "0x77fa7b6572ab5f14eac9d284d4f1c092a287100f2744aad738454596c4932399"
+      }
+    },
+    {
+      "id": "sigtransfer-single-mainnet",
+      "why": "SignatureTransfer.PermitTransferFrom. `spender` is not in the struct — the contract hashes msg.sender in its place.",
+      "kind": "PermitTransferFrom",
+      "chainId": 1,
+      "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+      "message": {
+        "permitted": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000"
+        },
+        "nonce": "0",
+        "deadline": "2000000000"
+      },
+      "expected": {
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "hashTokenPermissions": "0x21e28491850f405a080704038faf1ae8a4fa8722071211549f7d3345e9e7da4e",
+        "hashStruct": "0x94d2cea5c43cbec34a16e0e83875add4ac5148377b5a603946165c04231fc53b",
+        "digest": "0x4c080c5c2ec52a0f837843a5305ade8afc1d85046f252bac955cd89bdb16ed09"
+      }
+    },
+    {
+      "id": "sigtransfer-single-base-nonce-word1",
+      "why": "nonce = 500 -> wordPos 1, bitPos 244 in the unordered bitmap. Exercises a nonce that is not in word 0, which is where a naive implementation stops.",
+      "kind": "PermitTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "message": {
+        "permitted": {
+          "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "amount": "1000000000"
+        },
+        "nonce": "500",
+        "deadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashTokenPermissions": "0xb78c168e0aa6043e5f27fba55899fc06cd4665dde05723c5585c8c85c146f52f",
+        "hashStruct": "0x473db772a855da76925eb1e4c88e7f9e3e7e33a7775d8d25c49b759120289240",
+        "digest": "0xdd28d01e00233ba4558071f7bb37bd80e4c558d29e3a770797394a907de6f3f3"
+      }
+    },
+    {
+      "id": "sigtransfer-batch-base",
+      "why": "TokenPermissions[] array encoding, and the case where the spender may transfer a strict subset (requestedAmount = 0 is allowed per element).",
+      "kind": "PermitBatchTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "message": {
+        "permitted": [
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "1000000000000000000"
+          },
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000"
+          }
+        ],
+        "nonce": "501",
+        "deadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashTokenPermissions": [
+          "0x1fddead2c7bc62d458b8a616615143c2817def469a53b429a430b940c8b4a55d",
+          "0xb78c168e0aa6043e5f27fba55899fc06cd4665dde05723c5585c8c85c146f52f"
+        ],
+        "hashStruct": "0x929ad61d0fa7ef64599d774bd23ed40ffaeba8b37abff113b241552cf2ce655a",
+        "digest": "0x749468e8c7c64cb3808a56350790ac35e93cc1c30abbe9bdfe8236a1c419c52c"
+      }
+    },
+    {
+      "id": "sigtransfer-witness-single-base",
+      "why": "The only Permit2 shape in which the destination of the funds is inside the signature — because the integrator put it there, in the witness. Type string order is alphabetical: SwapIntent before TokenPermissions.",
+      "kind": "PermitWitnessTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "witnessTypeString": "SwapIntent witness)SwapIntent(address recipient,address tokenOut,uint256 minAmountOut)TokenPermissions(address token,uint256 amount)",
+      "witness": {
+        "recipient": "0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+        "tokenOut": "0x4200000000000000000000000000000000000006",
+        "minAmountOut": "240000000000000000"
+      },
+      "message": {
+        "permitted": {
+          "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "amount": "1000000000"
+        },
+        "nonce": "502",
+        "deadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashTokenPermissions": "0xb78c168e0aa6043e5f27fba55899fc06cd4665dde05723c5585c8c85c146f52f",
+        "witness": "0x9315aad086a21bf0b113e306715be6b54d834f8316130d7c3d736cf214f58203",
+        "witnessTypeHash": "0x51678267dbb3778fe2661eb8b17405a5bc548bc372457fa4d88f2a0cddda74b5",
+        "hashStruct": "0x53ac78717d9299fdf30daa791f5a811742abd99f6fff76ff64ff90523a68b908",
+        "digest": "0x2692d9788336e2a6274f35407c61f4a03e994f793494271b923518c57a28aa07"
+      }
+    },
+    {
+      "id": "sigtransfer-witness-batch-base",
+      "why": "Batch witness uses a different stub string. Reusing the single stub here produces a valid signature that the contract rejects.",
+      "kind": "PermitBatchWitnessTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "witnessTypeString": "SwapIntent witness)SwapIntent(address recipient,address tokenOut,uint256 minAmountOut)TokenPermissions(address token,uint256 amount)",
+      "witness": {
+        "recipient": "0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+        "tokenOut": "0x4200000000000000000000000000000000000006",
+        "minAmountOut": "240000000000000000"
+      },
+      "message": {
+        "permitted": [
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000"
+          },
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "500000000000000000"
+          }
+        ],
+        "nonce": "503",
+        "deadline": "1767225600"
+      },
+      "expected": {
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "hashTokenPermissions": [
+          "0xb78c168e0aa6043e5f27fba55899fc06cd4665dde05723c5585c8c85c146f52f",
+          "0x60501a77f46df5b9d7763fd851858823590600bf09e6f16dcb597ef4bf4255af"
+        ],
+        "witness": "0x9315aad086a21bf0b113e306715be6b54d834f8316130d7c3d736cf214f58203",
+        "witnessTypeHash": "0x87fa3ba2ee861f10beb39aa42ac75905ad34d85d7601a76cbada0ff59b9a8a46",
+        "hashStruct": "0x0aca80655f63671ccc6ef8bf02010c46fbfe260853cb09384304beb4ca424131",
+        "digest": "0xc091ff115f8e38135656bc92d6c20d098be21a473e71353ddc294efa539caf11"
+      }
+    }
+  ],
+  "note_integers": "Every integer is a decimal STRING. JSON numbers are IEEE-754 doubles in JavaScript: JSON.parse turns type(uint160).max into ...976, one more than the real value, and that is exactly the value that separates an infinite Permit2 approval from a finite one. Python's json would have parsed it exactly, so the two paths silently disagreed until this was fixed.",
+  "typeHashes": {
+    "PermitDetails": "0x65626cad6cb96493bf6f5ebea28756c966f023ab9e8a83a7101849d5573b3678",
+    "PermitSingle": "0xf3841cd1ff0085026a6327b620b67997ce40f282c88a8e905a7a5626e310f3d0",
+    "PermitBatch": "0xaf1b0d30d2cab0380e68f0689007e3254993c596f2fdd0aaa7f4d04f79440863",
+    "TokenPermissions": "0x618358ac3db8dc274f0cd8829da7e234bd48cd73c4a740aede1adec9846d06a1",
+    "PermitTransferFrom": "0x939c21a48a8dbe3a9a2404a1d46691e4d39f6583d6ec6b35714604c986d80106",
+    "PermitBatchTransferFrom": "0xfcf35f5ac6a2c28868dc44c302166470266239195f02b0ee408334829333b766",
+    "EIP712Domain(3-field)": "0x8cad95687ba82c2ce50e74f7b754645e5117c3a5bec8151c0726d5857980a866",
+    "SwapIntent": "0x254b35e0c51b19708022eb0daace3a9786c026e357dc2b55e84e4614d15ea49d"
+  }
+}
