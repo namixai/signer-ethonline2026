@@ -1,0 +1,69 @@
+name: verify
+
+# Two things run here, and they check different kinds of wrong.
+#
+# `scrub` is the hygiene gate: generic patterns for credentials, infrastructure identity
+# and internal paths. It runs first because a leak that reaches this repository is already
+# published — git history outlives a revert.
+#
+# `vectors` recomputes every pinned Permit2 digest along two implementations that share
+# nothing, and then plants six deliberate defects to prove the check can go red. A
+# cross-check nobody has seen fail is not evidence.
+#
+# Actions are pinned by commit SHA, not by tag. A tag is a moving pointer, and a workflow
+# that trusts one is trusting whoever can move it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scrub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: hygiene gate
+        run: ./scripts/scrub-check.sh
+
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: keccak golden vectors
+        working-directory: vectors
+        run: python3 keccak_min.py
+
+      - name: path A — our own encoder, standard library only
+        working-directory: vectors
+        run: python3 verify_ours.py
+
+      - name: falsification — six planted defects, all must be caught
+        working-directory: vectors
+        run: python3 falsify.py
+
+      - name: path B — Uniswap's own SDK, plus viem
+        working-directory: vectors
+        run: |
+          npm ci
+          node verify_sdk.mjs
+
+      # The emitted file must be byte-identical to the committed one. Without this, a
+      # change to the encoder could quietly rewrite the expectations it is checked against
+      # and every job above would still be green.
+      - name: pinned vectors are not silently regenerated
+        working-directory: vectors
+        run: |
+          python3 verify_ours.py --emit
+          git diff --exit-code -- permit2-vectors.json
