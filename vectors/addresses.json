@@ -1,0 +1,50 @@
+{
+  "about": "Deployed contracts this spec set was checked against. Every address here was confirmed on-chain on 2026-08-14, not copied from documentation. Re-run anchor_onchain.sh to confirm nothing moved.",
+  "method": "UniversalRouter names its own PoolManager through the public immutable getter poolManager(). Codehashes come from eth_getCode + keccak256. Permit2 domain separators come from DOMAIN_SEPARATOR() and are also visible inline in the runtime bytecode, because EIP712.sol caches them in an immutable.",
+  "checkedAt": "2026-08-14",
+  "chains": {
+    "1": {
+      "name": "ethereum",
+      "rpcUsed": "https://ethereum-rpc.publicnode.com",
+      "permit2": {
+        "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "domainSeparator": "0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28",
+        "codehash": "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131"
+      },
+      "universalRouter": {
+        "address": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+        "codehash": "0x6a5f46971b50c6e1b7eef97902311444e479d734e4f80ad88367783cf373fe7f",
+        "runtimeBytes": 19499,
+        "poolManagerReported": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+        "selectorsPresent": ["0x3593564c execute(bytes,bytes[],uint256)", "0x24856bc3 execute(bytes,bytes[])", "0xdc4c90d3 poolManager()"],
+        "selectorsAbsent": ["0x44684dc3 executeSigned(...)", "0x84b0196e eip712Domain()"]
+      },
+      "v4PoolManager": { "address": "0x000000000004444c5dc75cB358380D2e3dE08A90" }
+    },
+    "8453": {
+      "name": "base",
+      "rpcUsed": "https://mainnet.base.org",
+      "permit2": {
+        "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "domainSeparator": "0x3b6f35e4fce979ef8eac3bcdc8c3fc38fe7911bb0c69c8fe72bf1fd1a17e6f07",
+        "codehash": "0xa67739abc3ede9dbdc0491636c67d6a14ac07fab9030c3f509b1eb7b11dff8ed"
+      },
+      "universalRouter": {
+        "address": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "codehash": "0x27713951fb0660a1422b710122022d90723d883dc7b72949be79cb2957d234e0",
+        "runtimeBytes": 19499,
+        "poolManagerReported": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+        "selectorsPresent": ["0x3593564c execute(bytes,bytes[],uint256)", "0x24856bc3 execute(bytes,bytes[])", "0xdc4c90d3 poolManager()"],
+        "selectorsAbsent": ["0x44684dc3 executeSigned(...)", "0x84b0196e eip712Domain()"]
+      },
+      "v4PoolManager": { "address": "0x498581fF718922c3f8e6A244956aF099B2652b2b" }
+    }
+  },
+  "sourcePins": {
+    "Uniswap/permit2": "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219",
+    "Uniswap/universal-router": "fb25ff09c71dcfc13665e6c65788db737f29e0d4",
+    "Uniswap/v4-core": "46c6834698c48bc4a463a86d8420f4eb1d7f3b75",
+    "Uniswap/v4-periphery": "07336f2144f522874e2c3c85e04d1d3f8d5fa471"
+  },
+  "warning": "universal-router @ main carries RouteSigner / executeSigned with the EIP-712 type ExecuteSigned(bytes commands,bytes[] inputs,bytes32 intent,bytes32 data,address sender,bytes32 nonce,uint256 deadline) and domain EIP712('UniversalRouter','2'). Neither selector is present in the runtime bytecode at the two addresses above. Build against the deployed code, not against main, and re-check before you ship."
+}
