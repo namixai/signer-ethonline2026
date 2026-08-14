@@ -1,0 +1,211 @@
+{
+  "about": "Permit2 EIP-712 test vectors. Inputs only; the expected digests in permit2-vectors.json are derived from this file by verify_ours.py --emit and cross-checked by verify_sdk.mjs.",
+  "permit2Address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "note_spender": "For AllowanceTransfer, `spender` is a field of the signed struct and lives inside `message`. For SignatureTransfer it is NOT a struct field: PermitHash.hash() substitutes msg.sender, so it lives at case level. That asymmetry is the contract's, not ours.",
+  "cases": [
+    {
+      "id": "allowance-single-mainnet-regression",
+      "why": "Byte-for-byte the vector published in SPEC-permit2-eip712 on 2026-08-05. If this one ever moves, either the old spec or this file is wrong.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "2000000000",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      }
+    },
+    {
+      "id": "allowance-single-infinite-amount",
+      "why": "amount = type(uint160).max. AllowanceTransfer._transfer skips the decrement entirely at this value, so the allowance never depletes. The policy refuses this one.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1461501637330902918203684832716283019655932542975",
+          "expiration": "2000000000",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      }
+    },
+    {
+      "id": "allowance-single-expiration-zero-is-safe",
+      "why": "expiration = 0 is the SAFEST value, not the most dangerous: Allowance.updateAll stores uint48(block.timestamp), so the approval dies in the block that set it. A policy that rejects 0 is broken, not strict.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "0",
+          "nonce": "0"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "2000000000"
+      }
+    },
+    {
+      "id": "allowance-single-uint48-max-expiration",
+      "why": "expiration = type(uint48).max (year 8921921). Not infinite by the contract's own test, but infinite in practice — the case an absolute ceiling in policy has to catch.",
+      "kind": "PermitSingle",
+      "chainId": 1,
+      "message": {
+        "details": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000",
+          "expiration": "281474976710655",
+          "nonce": "65535"
+        },
+        "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "sigDeadline": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "id": "allowance-single-base-universalrouter",
+      "why": "Same shape on Base. Only chainId changed, and the digest is completely different — the domain separator carries it.",
+      "kind": "PermitSingle",
+      "chainId": 8453,
+      "message": {
+        "details": {
+          "token": "0x4200000000000000000000000000000000000006",
+          "amount": "1000000000000000000",
+          "expiration": "1767225600",
+          "nonce": "0"
+        },
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "sigDeadline": "1767225600"
+      }
+    },
+    {
+      "id": "allowance-batch-two-tokens-base",
+      "why": "PermitDetails[] enters as keccak of the concatenated member hashes, not as the members inline.",
+      "kind": "PermitBatch",
+      "chainId": 8453,
+      "message": {
+        "details": [
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "1000000000000000000",
+            "expiration": "1767225600",
+            "nonce": "0"
+          },
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000",
+            "expiration": "1767225600",
+            "nonce": "3"
+          }
+        ],
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "sigDeadline": "1767225600"
+      }
+    },
+    {
+      "id": "sigtransfer-single-mainnet",
+      "why": "SignatureTransfer.PermitTransferFrom. `spender` is not in the struct — the contract hashes msg.sender in its place.",
+      "kind": "PermitTransferFrom",
+      "chainId": 1,
+      "spender": "0x111111125421ca6dc452d289314280a0f8842a65",
+      "message": {
+        "permitted": {
+          "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "amount": "1000000000000000000"
+        },
+        "nonce": "0",
+        "deadline": "2000000000"
+      }
+    },
+    {
+      "id": "sigtransfer-single-base-nonce-word1",
+      "why": "nonce = 500 -> wordPos 1, bitPos 244 in the unordered bitmap. Exercises a nonce that is not in word 0, which is where a naive implementation stops.",
+      "kind": "PermitTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "message": {
+        "permitted": {
+          "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "amount": "1000000000"
+        },
+        "nonce": "500",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "sigtransfer-batch-base",
+      "why": "TokenPermissions[] array encoding, and the case where the spender may transfer a strict subset (requestedAmount = 0 is allowed per element).",
+      "kind": "PermitBatchTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "message": {
+        "permitted": [
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "1000000000000000000"
+          },
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000"
+          }
+        ],
+        "nonce": "501",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "sigtransfer-witness-single-base",
+      "why": "The only Permit2 shape in which the destination of the funds is inside the signature — because the integrator put it there, in the witness. Type string order is alphabetical: SwapIntent before TokenPermissions.",
+      "kind": "PermitWitnessTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "witnessTypeString": "SwapIntent witness)SwapIntent(address recipient,address tokenOut,uint256 minAmountOut)TokenPermissions(address token,uint256 amount)",
+      "witness": {
+        "recipient": "0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+        "tokenOut": "0x4200000000000000000000000000000000000006",
+        "minAmountOut": "240000000000000000"
+      },
+      "message": {
+        "permitted": {
+          "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "amount": "1000000000"
+        },
+        "nonce": "502",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "sigtransfer-witness-batch-base",
+      "why": "Batch witness uses a different stub string. Reusing the single stub here produces a valid signature that the contract rejects.",
+      "kind": "PermitBatchWitnessTransferFrom",
+      "chainId": 8453,
+      "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+      "witnessTypeString": "SwapIntent witness)SwapIntent(address recipient,address tokenOut,uint256 minAmountOut)TokenPermissions(address token,uint256 amount)",
+      "witness": {
+        "recipient": "0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+        "tokenOut": "0x4200000000000000000000000000000000000006",
+        "minAmountOut": "240000000000000000"
+      },
+      "message": {
+        "permitted": [
+          {
+            "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "amount": "1000000000"
+          },
+          {
+            "token": "0x4200000000000000000000000000000000000006",
+            "amount": "500000000000000000"
+          }
+        ],
+        "nonce": "503",
+        "deadline": "1767225600"
+      }
+    }
+  ],
+  "note_integers": "Every integer is a decimal STRING. JSON numbers are IEEE-754 doubles in JavaScript: JSON.parse turns type(uint160).max into ...976, one more than the real value, and that is exactly the value that separates an infinite Permit2 approval from a finite one. Python's json would have parsed it exactly, so the two paths silently disagreed until this was fixed."
+}
