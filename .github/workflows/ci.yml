@@ -13,10 +13,11 @@ name: verify
 # Actions are pinned by commit SHA, not by tag. A tag is a moving pointer, and a workflow
 # that trusts one is trusting whoever can move it.
 
+# Every branch, not just the trunk. A leak reaches the public the moment it is pushed
+# anywhere in a public repository, so gating only the default branch gates the wrong thing.
 on:
   pull_request:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
