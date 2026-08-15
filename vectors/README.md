@@ -8,11 +8,34 @@ not to pick a favourite.
 ## Run it
 
 ```bash
-python3 verify_ours.py     # path A — our own encoder, standard library only
-python3 falsify.py         # six deliberate defects; every one must be caught
+# Permit2 — the ERC-20 side
+python3 verify_ours.py          # path A — our own encoder, standard library only
+python3 falsify.py              # six deliberate defects; every one must be caught
 npm ci && node verify_sdk.mjs   # path B — Uniswap's own SDK, plus viem
-./anchor_onchain.sh        # optional, needs network + foundry: ask the deployed contracts
+
+# Position NFTs — the other signature in the swap path
+python3 verify_nft_ours.py      # path A, and it also checks the pinned on-chain domains
+python3 falsify_nft.py          # seven mutations
+node verify_nft_sdk.mjs         # path B — viem
+
+./anchor_onchain.sh             # optional, needs network + foundry: ask the deployed contracts
 ```
+
+## Two families, and why they are separate files
+
+`permit2-*` covers the ERC-20 side. `nft-*` covers the position-NFT permits of Uniswap v3
+and v4 — the *other* signature that can ride inside an ordinary swap transaction, forwarded
+by UniversalRouter command `0x11`.
+
+They are kept apart rather than generalised into one encoder on purpose: the Permit2 set is
+already merged and CI-green, and it earns its keep as a regression anchor. Folding it into a
+shared abstraction to save a few lines would put the anchor and the new work in the same
+blast radius.
+
+The single fact that makes the NFT set worth having: **v3 and v4 share the struct type hash
+`0x49ecf333…` and disagree about the domain** — v3's has a `version` field, v4's does not.
+Same struct hash, different digest. A "the type hash matches" check passes and proves
+nothing.
 
 The first two need nothing but Python 3. No network, no packages, no Ethereum library.
 `npm ci` needs the network once; after that path B runs offline too.

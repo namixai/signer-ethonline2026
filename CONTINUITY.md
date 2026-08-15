@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-08-14.
+**Last updated:** 2026-08-15.
 
 ## The position in one sentence
 
@@ -44,6 +44,8 @@ without it the integrations written in the window would be guesswork.
 | **2026-08-14** | **Uniswap execution path** — the swap is not signed; `executeSigned` from the router's `main` branch is not deployed at the live addresses | knowledge and spec (`specs/`) |
 | **2026-08-14** | **Permit2 test vectors** — 11 cases, two independent implementations, an on-chain anchor, six falsification mutations | bench (`vectors/`), does not ship as submission code |
 | **2026-08-14** | this repository created, with the August material imported under its real dates | disclosure, which is the point |
+| **2026-08-15** | **every signature surface in the swap path enumerated** — all 23 router commands classified; three forward a signature and a fourth nests; v3 and v4 position-NFT permits share a type hash and disagree about the domain | knowledge and spec (`specs/`) |
+| **2026-08-15** | **position-NFT permit vectors** — 7 cases, two paths, every domain separator anchored against the deployed contract, 7 falsification mutations | bench (`vectors/`), does not ship as submission code |
 
 ## What will be written IN THE WINDOW (from 4 September)
 
@@ -61,7 +63,9 @@ without it the integrations written in the window would be guesswork.
 | `specs/SPEC-permit2-signature-transfer.md` | 2026-08-14 |
 | `specs/SPEC-uniswap-execution-path.md` | 2026-08-14 |
 | `specs/SPEC-enclave-guarantee-boundary.md` | 2026-08-14 |
-| `vectors/` (cases, both verifiers, falsification, on-chain anchor) | 2026-08-14 |
+| `vectors/` — Permit2 family (cases, both verifiers, falsification, on-chain anchor) | 2026-08-14 |
+| `specs/SPEC-uniswap-signature-surfaces.md` | 2026-08-15 |
+| `vectors/` — position-NFT family (`nft-*`) | 2026-08-15 |
 | the Fusion, Permit2 and attestation specs of 2026-08-05, and the verifier-page spec of 2026-08-08 | imported as the window opens |
 
 ## Rules we hold ourselves to
