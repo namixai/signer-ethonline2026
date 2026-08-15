@@ -97,8 +97,22 @@ function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadl
 0x21 EXECUTE_SUB_PLAN
 ```
 
-**Единственная типизированная подпись здесь — `0x0a PERMIT2_PERMIT`.** Роутер не проверяет
-её сам, а пересылает в Permit2:
+🔴 **ПОПРАВКА 2026-08-15, снята мной же.** Первая редакция этого абзаца говорила
+«единственная типизированная подпись здесь — `0x0a PERMIT2_PERMIT`». Это **неполно**.
+Тогда я прочитал только ветки свопа и Permit2 и честно пометил остальные как непроверенные
+(§«Границы»); при полном разборе всех 23 команд нашлись ещё две подписные ветки и
+рекурсия. Верный список — `SPEC-uniswap-signature-surfaces.md` §1:
+
+- `0x0a PERMIT2_PERMIT` и `0x03 PERMIT2_PERMIT_BATCH` — в Permit2;
+- **`0x11 V3_POSITION_MANAGER_PERMIT` — ERC-721 permit в v3 NonfungiblePositionManager,
+  совсем другой домен**;
+- `0x21 EXECUTE_SUB_PLAN` — исполняет вложенный набор команд, в котором может быть любая
+  из трёх выше.
+
+Абзац ниже оставлен как есть, потому что про `0x0a` он верен; неверным было слово
+«единственная».
+
+**`0x0a PERMIT2_PERMIT`.** Роутер не проверяет подпись сам, а пересылает в Permit2:
 
 ```solidity
 address(PERMIT2).call(abi.encodeWithSignature(
