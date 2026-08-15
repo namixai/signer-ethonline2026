@@ -151,8 +151,9 @@ Uniswap. Каждый пункт — следствие из исходнико�
 > never says who owns it; the contract looks that up when the signature gets used, not when
 > it was made. So the enclave can sign a permit for a position it cannot see. Not which
 > pair, not how much is in it, not whether it is still yours. A token id, a spender, a
-> deadline: that is the whole of what we get to check, and the rest is chain state we would
-> have to be told by whoever is asking.
+> nonce and a deadline: that is the whole of what we get to check — and the nonce we can
+> only read, not judge, because whether it is the current one or already spent is again
+> chain state, and the only source for it is whoever is asking us to sign.
 
 ## 8. Проверка этого документа самим собой
 

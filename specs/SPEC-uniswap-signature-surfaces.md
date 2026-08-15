@@ -190,9 +190,15 @@ else permit2TransferFrom(token, payer, recipient, amount.toUint160());
    утверждённый список, — отказ. Список сегодня: Permit2 (`PermitSingle`, `PermitBatch`,
    `PermitTransferFrom`, `PermitBatchTransferFrom`, оба witness-варианта), v3 NFT `Permit`,
    v4 NFT `Permit` и `PermitForAll`.
-2. `spender` / `operator` ∉ allow-list → отказ. Несущая проверка: в Permit2 она
-   единственная связывает подпись с миром, в NFT-permit она же решает, кто получит право
-   распоряжаться позицией.
+2. `spender` / `operator` ∉ allow-list → отказ. Несущая проверка, но **сверять надо
+   разное в разных семьях**:
+   - `AllowanceTransfer` (`PermitSingle`/`PermitBatch`) и оба NFT-permit'а: `spender` —
+     поле подписываемой структуры, сверяем его;
+   - `SignatureTransfer`, включая witness-варианты: поля `spender` в структуре **нет**,
+     Permit2 хеширует туда `msg.sender`. Сверять надо адрес, который будет вызывать
+     Permit2, и он обязан прийти в запросе явно, без значения по умолчанию;
+   - `SignatureTransferDetails.to` — **отдельный случай, и проверить его нельзя**:
+     получатель в подпись не входит вовсе, это calldata предъявителя.
 3. `token` ∉ allow-list, сумма выше потолка (в сырых единицах) → отказ.
 4. `amount == type(uint160).max` в AllowanceTransfer → отказ, независимо от потолка.
 5. `PermitForAll(approved = true)` → отказ вне узкого списка; `approved = false`
@@ -201,8 +207,11 @@ else permit2TransferFrom(token, payer, recipient, amount.toUint160());
    Абсолютный потолок часов не требует.
 7. Для транзакции роутера, если её вообще подписывать: `to` = проверенный адрес роутера
    этой сети, `chainId` ожидаемый, байт команды ∈ узкий список, **разбор рекурсивный**
-   (§3), `amountOutMinimum` не ноль, все `Currency` и `hooks` каждого `PoolKey` ∈
-   allow-list, итоговый получатель после разбора всей последовательности — владелец.
+   (§3), все `Currency` и `hooks` каждого `PoolKey` ∈ allow-list, итоговый получатель
+   после разбора всей последовательности — владелец. Поле защиты от проскальзывания
+   **зависит от команды**: у exact-in это `amountOutMinimum`, у exact-out —
+   `amountInMaximum`. Проверять только первое — значит оставить exact-out без защиты
+   и не заметить этого.
 8. Ненулевые биты выше 159-го в адресном слове → отказ.
 
 **Не может, и это границы, а не недоработки:**
