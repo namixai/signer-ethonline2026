@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Path A runner for the position-NFT permits.
+
+    python3 verify_nft_ours.py          # verify against the pinned file
+    python3 verify_nft_ours.py --emit   # regenerate it from nft-cases.json
+
+Beyond recomputing every digest, this also checks each case's domain separator against
+the value the deployed contract reported on 2026-08-15, which is pinned in the case file.
+That turns a reading of the source into a claim about the chain: if we misread whether
+the domain carries a `version` field, this is where it shows.
+
+No network, no third-party packages.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import nft_permit_ref as ref  # noqa: E402
+from keccak_min import keccak256  # noqa: E402
+
+VECTORS = os.path.join(HERE, "nft-permit-vectors.json")
+CASES = os.path.join(HERE, "nft-cases.json")
+
+
+def h(b: bytes) -> str:
+    return "0x" + b.hex()
+
+
+def domain_of(case: dict) -> bytes:
+    d = case["domain"]
+    if case["kind"] == "V3Permit":
+        return ref.domain_v3(d["name"], d["version"], case["chainId"], case["verifyingContract"])
+    return ref.domain_v4(d["name"], case["chainId"], case["verifyingContract"])
+
+
+def compute(case: dict) -> dict:
+    ds = domain_of(case)
+    m = case["message"]
+    if case["kind"] in ("V3Permit", "V4Permit"):
+        sh = ref.hash_permit(m)
+        th = ref.type_hash(ref.TS_PERMIT)
+    elif case["kind"] == "V4PermitForAll":
+        sh = ref.hash_permit_for_all(m)
+        th = ref.type_hash(ref.TS_PERMIT_FOR_ALL)
+    else:
+        raise ValueError(f"unknown kind: {case['kind']}")
+    return {
+        "domainSeparator": h(ds),
+        "typeHash": h(th),
+        "hashStruct": h(sh),
+        "digest": h(ref.digest(ds, sh)),
+    }
+
+
+def emit():
+    with open(CASES, encoding="utf-8") as f:
+        doc = json.load(f)
+    for case in doc["cases"]:
+        case["expected"] = compute(case)
+    doc["typeHashes"] = {
+        "Permit": h(ref.type_hash(ref.TS_PERMIT)),
+        "PermitForAll": h(ref.type_hash(ref.TS_PERMIT_FOR_ALL)),
+        "EIP712Domain(4-field, v3)": h(ref.type_hash(ref.TS_DOMAIN_4)),
+        "EIP712Domain(3-field, v4)": h(ref.type_hash(ref.TS_DOMAIN_3)),
+    }
+    with open(VECTORS, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"wrote {VECTORS} ({len(doc['cases'])} cases)")
+
+
+def verify() -> int:
+    if not os.path.exists(VECTORS):
+        print(f"FAIL: {VECTORS} is missing — run with --emit first", file=sys.stderr)
+        return 1
+    with open(VECTORS, encoding="utf-8") as f:
+        doc = json.load(f)
+
+    if keccak256(b"").hex() != "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470":
+        print("FAIL: keccak256 golden vector mismatch", file=sys.stderr)
+        return 1
+
+    bad = 0
+    for case in doc["cases"]:
+        got, want = compute(case), case["expected"]
+        for key in sorted(set(got) | set(want)):
+            if got.get(key) != want.get(key):
+                bad += 1
+                print(f"MISMATCH {case['id']}.{key}\n  pinned {want.get(key)}\n  ours   {got.get(key)}")
+        # The claim about the chain, not just about our own arithmetic.
+        onchain = case.get("onchainDomainSeparator")
+        if onchain and got["domainSeparator"].lower() != onchain.lower():
+            bad += 1
+            print(f"MISMATCH {case['id']}.domainSeparator vs DEPLOYED CONTRACT"
+                  f"\n  contract reported {onchain}\n  we compute        {got['domainSeparator']}"
+                  f"\n  -> our reading of the domain shape is wrong, or the contract moved.")
+
+    # The whole point of keeping these two families apart: same struct, different digest.
+    v3 = next((c for c in doc["cases"] if c["id"] == "v3-permit-mainnet-to-universalrouter"), None)
+    v4 = next((c for c in doc["cases"] if c["id"] == "v4-permit-mainnet-same-message-as-v3"), None)
+    if v3 and v4:
+        if v3["expected"]["hashStruct"] != v4["expected"]["hashStruct"]:
+            bad += 1
+            print("MISMATCH the v3/v4 trap case no longer shares a struct hash — "
+                  "the pair stops demonstrating what it exists to demonstrate")
+        if v3["expected"]["digest"] == v4["expected"]["digest"]:
+            bad += 1
+            print("MISMATCH v3 and v4 digests are equal; the domains must differ")
+
+    if bad:
+        print(f"\nFAIL — {bad} mismatch(es).")
+        return 1
+    n = len(doc["cases"])
+    print(f"OK — path A reproduced {n} position-NFT cases, "
+          f"{len(doc.get('typeHashes', {}))} type hashes, and every pinned on-chain domain separator.")
+    return 0
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--emit", action="store_true")
+    args = ap.parse_args()
+    sys.exit(emit() or 0) if args.emit else sys.exit(verify())
