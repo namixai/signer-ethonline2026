@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-08-16.
+**Last updated:** 2026-08-16 (demo storyboard + runnable script).
 
 ## The position in one sentence
 
@@ -69,6 +69,7 @@ without it the integrations written in the window would be guesswork.
 | `specs/SPEC-uniswap-signature-surfaces.md` | 2026-08-15 |
 | `vectors/` — position-NFT family (`nft-*`) | 2026-08-15 |
 | `vectors/onchain_fieldorder.mjs` — field order judged by the deployed Permit2 | 2026-08-16 |
+| `demo/STORYBOARD-hyperliquid.md` + `demo/demo.sh` — three frames, runnable rather than filmed | 2026-08-16 |
 | the Fusion, Permit2 and attestation specs of 2026-08-05, and the verifier-page spec of 2026-08-08 | imported as the window opens |
 
 ## Rules we hold ourselves to
