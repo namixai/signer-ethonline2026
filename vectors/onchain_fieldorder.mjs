@@ -26,11 +26,14 @@
 //
 // 🔴 It is NOT Anvil's account #0, and the reason is a finding worth keeping. That address
 // has an EIP-7702 delegation on mainnet (its code is 0xef0100…), so `claimedSigner.code.length`
-// is non-zero and Permit2 takes the ERC-1271 branch instead of ecrecover — it calls
-// isValidSignature on the delegate, which reverts with no data. A perfectly good signature
-// is never even examined. Any owner address carrying a 7702 delegation behaves the same way,
-// which is a live consideration for a signer: whether our signature is checked at all depends
-// on chain state we do not control and cannot see from inside the enclave.
+// is non-zero and Permit2 takes the ERC-1271 branch instead of ecrecover: it asks the
+// delegate's isValidSignature, and the delegate there reverts with no data.
+//
+// Precisely: the signature is not left unchecked — the check is REDIRECTED. What happens to
+// an ordinary ECDSA signature then depends entirely on the delegate's code, and in this case
+// it is discarded without ever being recovered. Any owner carrying a 7702 delegation behaves
+// the same way, which is a live consideration for a signer: which verification path our
+// signature meets is chain state we do not control and cannot see from inside the enclave.
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -147,7 +150,7 @@ async function main() {
   const code = await rpc("eth_getCode", [TEST_ADDR, "latest"]);
   if (code.result && code.result !== "0x") {
     console.log(`FAIL probe address ${TEST_ADDR} has code (${code.result.slice(0, 12)}…).`);
-    console.log("     Permit2 would take the ERC-1271 branch and never reach ecrecover;");
+    console.log("     Permit2 would redirect to the ERC-1271 branch and never reach ecrecover;");
     console.log("     this check would be measuring the delegate, not our field order.");
     process.exit(1);
   }
@@ -198,7 +201,12 @@ async function main() {
       console.log(`ok   negative: mis-ordered digest ${swapped}`);
       console.log("     rejected with InvalidSigner — the check can go red, so the positive means something");
     } else if (r2.error) {
-      console.log(`ok   negative: rejected (${err.slice(0, 120)})`);
+      // Any other revert, and any transport failure, proves nothing. Accepting them as a
+      // pass would let a flaky RPC turn this whole file green without Permit2 ever having
+      // recovered a signer — the exact defect this check exists to rule out, one layer up.
+      bad++;
+      console.log(`FAIL negative: rejected, but NOT with InvalidSigner (${err.slice(0, 140)})`);
+      console.log("     the transposed digest has to fail through signer recovery, or this proves nothing");
     } else {
       bad++;
       console.log("FAIL negative: the contract ACCEPTED a mis-ordered digest. Something is very wrong.");
