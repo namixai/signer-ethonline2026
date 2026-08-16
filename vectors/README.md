@@ -19,7 +19,30 @@ python3 falsify_nft.py          # seven mutations
 node verify_nft_sdk.mjs         # path B — viem
 
 ./anchor_onchain.sh             # optional, needs network + foundry: ask the deployed contracts
+node onchain_fieldorder.mjs     # optional, needs network: let Permit2 judge our field order
 ```
+
+## The one thing the offline paths cannot check
+
+Both of them take the ORDER of fields inside a struct from the same reading of the same type
+string. Concatenate `nonce` before `tokenId` and both paths agree, both are wrong, and the
+type hash does not help — it hashes the type *string*, which was never the broken part.
+
+On 2026-08-15 a live Hyperliquid order was rejected for exactly this: field order inside the
+signed action differed from canonical (`s` before `r`), the venue rebuilt the payload its own
+way, and recovery returned a different address. Valid signature, wrong bytes, no useful error.
+
+`onchain_fieldorder.mjs` closes it by letting the deployed Permit2 be the judge. Our encoder
+produces a digest, a throwaway key signs it, and `permit()` is simulated via `eth_call`:
+the contract recovers a signer from *its* digest and compares. Accepted means it rebuilt the
+same bytes we did. Then the negative — transpose `expiration` and `nonce`, both `uint48`, so
+the type string, the type hash and every width stay correct and only the order moves — and
+the contract answers `InvalidSigner`. Read-only throughout; nothing is broadcast.
+
+Not covered by that: field order in the position-NFT permits. Permit2 accepts any `owner`
+argument, so it can be probed; the NFT contracts read `ownerOf(tokenId)`, which would need a
+real position held by the probe key. Those have the offline transposition mutation and no
+contract-side confirmation, and the spec says so rather than implying otherwise.
 
 ## Two families, and why they are separate files
 
