@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-08-15.
+**Last updated:** 2026-08-16.
 
 ## The position in one sentence
 
@@ -24,6 +24,7 @@ Knowledge gathered before the event is not hidden — it is here, dated.
 | **`sign_data`** — data signed by a separate attested key | designed 06.2026, implemented in the main lane | design documents in the repository |
 | **attested-snapshot** — a signed market snapshot | schema contract v2, July 2026 | contract + public verification page |
 | **Policy before signature** — limits applied in the enclave before signing | in production on CEX venues | sources |
+| **A full live cycle on a real venue** — key minted inside the enclave, attested policy with a cap, order signed and accepted, cancel accepted | 2026-08-15, on Hyperliquid. An order over the cap was refused inside the measurement: cap 0.041 BNB, 0.03 went through, 0.05 did not | our own account and our own money; no external audit; one venue for order signing plus Binance |
 
 ## What was written in August, BEFORE the window
 
@@ -45,6 +46,7 @@ without it the integrations written in the window would be guesswork.
 | **2026-08-14** | **Permit2 test vectors** — 11 cases, two independent implementations, an on-chain anchor, six falsification mutations | bench (`vectors/`), does not ship as submission code |
 | **2026-08-14** | this repository created, with the August material imported under its real dates | disclosure, which is the point |
 | **2026-08-15** | **every signature surface in the swap path enumerated** — all 23 router commands classified; three forward a signature and a fourth nests; v3 and v4 position-NFT permits share a type hash and disagree about the domain | knowledge and spec (`specs/`) |
+| **2026-08-15** | **the enclave signed a live order on Hyperliquid and the venue accepted it**; the cancel went through; an over-cap order was refused inside the measurement | product milestone, not hackathon work — the signing path predates the event |
 | **2026-08-15** | **position-NFT permit vectors** — 7 cases, two paths, every domain separator anchored against the deployed contract, 7 falsification mutations | bench (`vectors/`), does not ship as submission code |
 
 ## What will be written IN THE WINDOW (from 4 September)
@@ -66,6 +68,7 @@ without it the integrations written in the window would be guesswork.
 | `vectors/` — Permit2 family (cases, both verifiers, falsification, on-chain anchor) | 2026-08-14 |
 | `specs/SPEC-uniswap-signature-surfaces.md` | 2026-08-15 |
 | `vectors/` — position-NFT family (`nft-*`) | 2026-08-15 |
+| `vectors/onchain_fieldorder.mjs` — field order judged by the deployed Permit2 | 2026-08-16 |
 | the Fusion, Permit2 and attestation specs of 2026-08-05, and the verifier-page spec of 2026-08-08 | imported as the window opens |
 
 ## Rules we hold ourselves to
@@ -86,4 +89,8 @@ without it the integrations written in the window would be guesswork.
   and a live Hyperliquid integration, and has raised more than $65M. **We are not first.**
   Any uniqueness claim survives exactly one search, and takes the credibility of everything
   around it when it goes.
+- **We say what the live run does not cover.** The Hyperliquid cycle of 2026-08-15 ran on
+  our own account with our own money, has had no external audit, and covers one venue for
+  order signing plus Binance. Stating the milestone without those four words next to it
+  would be the same overreach as any other unqualified claim.
 - **Dates do not move.** If a component existed before the event, it says so.

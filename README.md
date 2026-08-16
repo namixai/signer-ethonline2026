@@ -24,6 +24,18 @@ policy-applied-before-signature on CEX venues were all built between May and Jul
 They are public and independently checkable at
 [namixai/signer](https://github.com/namixai/signer).
 
+**And the signing path runs on a real venue now.** On 15 August the enclave signed an order
+on Hyperliquid, the venue took it, and the cancel went through afterwards. Whole cycle, no
+human anywhere in the signing chain. The key was minted inside the enclave and has never
+existed outside it, and an order over the policy cap was refused before it could become a
+signature — refused inside the measurement, not by something downstream that could be
+switched off. Cap 0.041 BNB; an order of 0.03 went through; 0.05 did not.
+
+**What that is not.** It is our own account and our own money, so nobody has trusted us with
+theirs yet. There has been no external audit. Order signing runs on one venue plus Binance,
+and that is the whole list. And we are not first at any of this — the rules we hold
+ourselves to are in `CONTINUITY.md`, and the first of them forbids that claim.
+
 **Research done in August, before the window, is in this repository under its real dates.**
 That means the three specs in `specs/` and the whole of `vectors/`, all dated 2026-08-14,
 plus the earlier August specs imported as the window opens. They are research and test
