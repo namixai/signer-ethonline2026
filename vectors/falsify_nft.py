@@ -106,6 +106,28 @@ mutate(
     ),
 )
 
+# 6b. Two uint256 fields transposed. In Permit(spender, tokenId, nonce, deadline) three of
+#     the four are uint256, so a transposition is invisible to every type-level check — the
+#     same shape as the field-order defect that got a live Hyperliquid order rejected.
+orig_permit = ref.hash_permit
+
+
+def transposed_permit(m):
+    from keccak_min import keccak256 as k
+    return k(
+        ref.type_hash(ref.TS_PERMIT)
+        + ref.enc_address(m["spender"])
+        + ref.enc_uint(m["nonce"])      # <- tokenId and nonce
+        + ref.enc_uint(m["tokenId"])    # <- are transposed
+        + ref.enc_uint(m["deadline"])
+    )
+
+
+mutate("tokenId/nonce transposed (both uint256, invisible to types)",
+       "v3-permit-nonce-not-zero",
+       lambda: setattr(ref, "hash_permit", transposed_permit),
+       lambda: setattr(ref, "hash_permit", orig_permit))
+
 # 7. The on-chain anchor itself must bite. Corrupt the pinned separator and the runner has
 #    to notice — otherwise "we checked against the deployed contract" is decoration.
 #

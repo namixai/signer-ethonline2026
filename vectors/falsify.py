@@ -107,6 +107,29 @@ mutation("uint160/uint48 packed to declared width", "allowance-single-mainnet-re
          lambda: setattr(ref, "hash_permit_details", packed_details),
          lambda: setattr(ref, "hash_permit_details", orig_details))
 
+# 3b. Two fields of the SAME width transposed — the Hyperliquid defect, transplanted.
+#     expiration and nonce are both uint48. Swapping them leaves the type string, the type
+#     hash and every declared width untouched; nothing but the concatenation order changes.
+#     A live order was rejected for exactly this on 2026-08-15 (s placed before r), and no
+#     type check anywhere can see it.
+orig_details_2 = ref.hash_permit_details
+
+
+def transposed_details(d):
+    return keccak256(
+        ref.type_hash(ref.TS_PERMIT_DETAILS)
+        + ref.enc_address(d["token"])
+        + ref.enc_uint(d["amount"])
+        + ref.enc_uint(d["nonce"])        # <- these two
+        + ref.enc_uint(d["expiration"])   # <- are transposed
+    )
+
+
+mutation("uint48 expiration/nonce transposed (same width, invisible to types)",
+         "allowance-single-mainnet-regression",
+         lambda: setattr(ref, "hash_permit_details", transposed_details),
+         lambda: setattr(ref, "hash_permit_details", orig_details_2))
+
 # 4. Batch witness built on the single-transfer stub.
 orig_stub = ref.STUB_WITNESS_BATCH
 mutation("batch witness built on the single stub", "sigtransfer-witness-batch-base",
