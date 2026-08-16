@@ -64,6 +64,20 @@ typed data, so it should be a check of its own in the vectors.
 
 Still out of scope for August: writing the enclave integration.
 
+## What went wrong on the first attempt, and what fixed it
+
+The first version of the live-run paragraphs took the numbers straight from the prompt and
+published them. A red-team pass over the drafted text then went and read the department's
+own reports, and the text was wrong in ways the reports settle outright: the date was
+15 August rather than 16; the under-cap probe was 0.010 BNB, not 0.03 — 0.03 was the
+venue-accepted order from a later run, so the two runs had been stitched into one; "no human
+anywhere in the signing chain" skipped a required on-chain approval from the account; "the
+venue took it" read as a fill when the order rested and was cancelled; and "the key has never
+existed outside the enclave" is false as written, since the wrapped blob sits on disk.
+
+The instruction said to use only the numbers given. The mistake was treating that as
+permission not to check them against the primary reports, which were one command away.
+
 ## What the model did with it
 
 The vectors and the policy line asked for in part 2 already existed from prompt 02, in the
