@@ -113,7 +113,9 @@ Uniswap. Каждый пункт — следствие из исходнико�
 
 ## 7. Как это звучит снаружи
 
-Черновик под гейт клеймов. **Не публиковать до одобрения CTO.**
+Черновик под гейт клеймов. **Не выносить в лендинг, текст заявки и титры видео до
+одобрения CTO** — сам файл лежит в публичном репозитории, потому что это рабочая спека,
+а не секрет; ограничение про использование формулировки, а не про доступ к ней.
 
 > **What the enclave promises, and where the promise stops.**
 >
@@ -139,6 +141,19 @@ Uniswap. Каждый пункт — следствие из исходнико�
 >
 > We're not planning to close any of these. A signer that knew the market would have to be
 > something other than a signer.
+
+Дополнение 2026-08-15, после разбора подписных поверхностей (`SPEC-uniswap-signature-surfaces.md`).
+Граница по цене, MEV и проскальзыванию не сдвинулась; добавились три пункта, все — состояние
+цепочки. Абзац под тот же гейт:
+
+> There is a second kind of signature in the Uniswap path — over positions rather than
+> tokens — and it comes with its own blind spot. The signed message names a token id and
+> never says who owns it; the contract looks that up when the signature gets used, not when
+> it was made. So the enclave can sign a permit for a position it cannot see. Not which
+> pair, not how much is in it, not whether it is still yours. A token id, a spender, a
+> nonce and a deadline: that is the whole of what we get to check — and the nonce we can
+> only read, not judge, because whether it is the current one or already spent is again
+> chain state, and the only source for it is whoever is asking us to sign.
 
 ## 8. Проверка этого документа самим собой
 

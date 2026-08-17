@@ -1,0 +1,125 @@
+{
+  "about": "Position-NFT permit vectors — Uniswap v3 NonfungiblePositionManager and v4 PositionManager. Inputs only; expectations are derived by verify_nft_ours.py --emit and cross-checked by verify_nft_sdk.mjs.",
+  "note_integers": "Every integer is a decimal string, for the reason recorded in ../vectors/README.md: JSON numbers are IEEE-754 doubles in JavaScript.",
+  "note_the_trap": "v3 and v4 share the struct type hash 0x49ecf333... and differ only in the domain: v3 has a `version` field, v4 does not. Checking the type hash therefore proves nothing about which contract will accept the signature.",
+  "note_onchain": "Each case pins the domain separator reported by the deployed contract on 2026-08-15. verify_nft_ours.py recomputes it offline and compares — so the file fails if either our reading or the chain moves.",
+  "contracts": {
+    "1": {
+      "v3PositionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "v4PositionManager": "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e",
+      "universalRouter": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af"
+    },
+    "8453": {
+      "v3PositionManager": "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1",
+      "v4PositionManager": "0x7C5f5A4bBd8fD63184577525326123B519429bDc",
+      "universalRouter": "0x6fF5693b99212Da76ad316178A184AB56D299b43"
+    }
+  },
+  "cases": [
+    {
+      "id": "v3-permit-mainnet-to-universalrouter",
+      "why": "The exact shape the UniversalRouter forwards under command 0x11 (V3_POSITION_MANAGER_PERMIT): approve the router for one position so it can migrate it. Four-field domain, with version.",
+      "kind": "V3Permit",
+      "chainId": 1,
+      "verifyingContract": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "domain": { "name": "Uniswap V3 Positions NFT-V1", "version": "1" },
+      "onchainDomainSeparator": "0x24ea63bbfcb16de2524c7c24322b6cbc39cb2d08881bce770af4771e6b1ad117",
+      "message": {
+        "spender": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+        "tokenId": "1000000",
+        "nonce": "0",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v3-permit-base",
+      "why": "Same message on Base. Only chainId and verifyingContract move, and the digest is unrecognisably different.",
+      "kind": "V3Permit",
+      "chainId": 8453,
+      "verifyingContract": "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1",
+      "domain": { "name": "Uniswap V3 Positions NFT-V1", "version": "1" },
+      "onchainDomainSeparator": "0x00b853c564e31dfaa60c381b63e5bbb16df85a2b1c2458a95c50bbdfc8e78abb",
+      "message": {
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "tokenId": "1000000",
+        "nonce": "0",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v3-permit-nonce-not-zero",
+      "why": "The v3 nonce is per tokenId and lives on chain (_positions[tokenId].nonce++). The signer must read it before signing and cannot verify it locally — this case exists so the encoding of a non-zero nonce is pinned.",
+      "kind": "V3Permit",
+      "chainId": 1,
+      "verifyingContract": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "domain": { "name": "Uniswap V3 Positions NFT-V1", "version": "1" },
+      "onchainDomainSeparator": "0x24ea63bbfcb16de2524c7c24322b6cbc39cb2d08881bce770af4771e6b1ad117",
+      "message": {
+        "spender": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+        "tokenId": "1000000",
+        "nonce": "7",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v4-permit-mainnet-same-message-as-v3",
+      "why": "🔴 The trap, made explicit. Byte-for-byte the same struct as the first case — same type hash, same spender, same tokenId, same nonce, same deadline — and a completely different digest, because the v4 domain has no `version`. Nothing in the type hash warns you.",
+      "kind": "V4Permit",
+      "chainId": 1,
+      "verifyingContract": "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e",
+      "domain": { "name": "Uniswap v4 Positions NFT" },
+      "onchainDomainSeparator": "0x5a2844e1b5e82beddf818b9dbccf114c9fd858817231799eae82c719362c57e6",
+      "message": {
+        "spender": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+        "tokenId": "1000000",
+        "nonce": "0",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v4-permit-base",
+      "why": "v4 on Base. The nonce here is an unordered bitmap keyed by OWNER, not by tokenId — a different scheme from v3 with the same field name.",
+      "kind": "V4Permit",
+      "chainId": 8453,
+      "verifyingContract": "0x7C5f5A4bBd8fD63184577525326123B519429bDc",
+      "domain": { "name": "Uniswap v4 Positions NFT" },
+      "onchainDomainSeparator": "0x1e14c9ddc0e8bcb6a6c61d683ddb2de4da75652e92b0dc55f376f4fc30440e67",
+      "message": {
+        "spender": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "tokenId": "1000000",
+        "nonce": "500",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v4-permitForAll-approved-true-UNBOUNDED",
+      "why": "🔴 The unbounded approval of the position path. No tokenId, no amount, no ceiling: `approved = true` hands one address control of every position the owner holds, present and future. Permit2 at least has an amount field to cap; this one has nothing but the deadline. Policy refuses it outside a narrow allow-list.",
+      "kind": "V4PermitForAll",
+      "chainId": 8453,
+      "verifyingContract": "0x7C5f5A4bBd8fD63184577525326123B519429bDc",
+      "domain": { "name": "Uniswap v4 Positions NFT" },
+      "onchainDomainSeparator": "0x1e14c9ddc0e8bcb6a6c61d683ddb2de4da75652e92b0dc55f376f4fc30440e67",
+      "message": {
+        "operator": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "approved": "true",
+        "nonce": "501",
+        "deadline": "1767225600"
+      }
+    },
+    {
+      "id": "v4-permitForAll-approved-false-is-revocation",
+      "why": "The same message with approved = false REVOKES. A policy that refuses PermitForAll wholesale would block the owner from withdrawing an operator's blanket access — refusing a revocation is the mirror of the expiration=0 mistake in the Permit2 set.",
+      "kind": "V4PermitForAll",
+      "chainId": 8453,
+      "verifyingContract": "0x7C5f5A4bBd8fD63184577525326123B519429bDc",
+      "domain": { "name": "Uniswap v4 Positions NFT" },
+      "onchainDomainSeparator": "0x1e14c9ddc0e8bcb6a6c61d683ddb2de4da75652e92b0dc55f376f4fc30440e67",
+      "message": {
+        "operator": "0x6fF5693b99212Da76ad316178A184AB56D299b43",
+        "approved": "false",
+        "nonce": "502",
+        "deadline": "1767225600"
+      }
+    }
+  ]
+}

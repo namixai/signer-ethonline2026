@@ -46,19 +46,28 @@ jobs:
         working-directory: vectors
         run: python3 keccak_min.py
 
-      - name: path A — our own encoder, standard library only
+      - name: Permit2 — path A, our own encoder, standard library only
         working-directory: vectors
         run: python3 verify_ours.py
 
-      - name: falsification — six planted defects, all must be caught
+      - name: Permit2 — falsification, six planted defects, all must be caught
         working-directory: vectors
         run: python3 falsify.py
+
+      - name: position NFTs — path A, incl. the pinned on-chain domain separators
+        working-directory: vectors
+        run: python3 verify_nft_ours.py
+
+      - name: position NFTs — falsification, seven mutations
+        working-directory: vectors
+        run: python3 falsify_nft.py
 
       - name: path B — Uniswap's own SDK, plus viem
         working-directory: vectors
         run: |
           npm ci
           node verify_sdk.mjs
+          node verify_nft_sdk.mjs
 
       # The emitted file must be byte-identical to the committed one. Without this, a
       # change to the encoder could quietly rewrite the expectations it is checked against
@@ -67,4 +76,5 @@ jobs:
         working-directory: vectors
         run: |
           python3 verify_ours.py --emit
-          git diff --exit-code -- permit2-vectors.json
+          python3 verify_nft_ours.py --emit
+          git diff --exit-code -- permit2-vectors.json nft-permit-vectors.json

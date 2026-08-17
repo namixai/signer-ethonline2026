@@ -14,9 +14,12 @@
 
 На боевых роутерах mainnet и Base своп — это обычная EVM-транзакция с вызовом
 `execute(bytes commands, bytes[] inputs, uint256 deadline)`. Подписывается она так же, как
-любая транзакция: ECDSA над keccak от RLP. Единственная типизированная подпись во всём
-потоке — **разрешение Permit2**, и оно едет внутри той же транзакции как байты одного из
-входов.
+любая транзакция: ECDSA над keccak от RLP. Типизированные подписи в потоке есть, но ни
+одна из них не про сам своп: `0x0a PERMIT2_PERMIT` и `0x03 PERMIT2_PERMIT_BATCH`
+(проверяет Permit2), `0x11 V3_POSITION_MANAGER_PERMIT` (ERC-721 permit, проверяет v3
+NonfungiblePositionManager), плюс `0x21 EXECUTE_SUB_PLAN`, вкладывающий любую из них
+внутрь себя. Все они едут внутри той же транзакции как байты входов. Полный разбор —
+`SPEC-uniswap-signature-surfaces.md`.
 
 Это качественно другая работа, чем 1inch Fusion и Permit2: там энклав разбирает
 **структуру**, здесь ему пришлось бы разбирать **calldata**. Разница не в объёме, а в
@@ -93,12 +96,26 @@ function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadl
 0x06 PAY_PORTION          0x08 V2_SWAP_EXACT_IN    0x09 V2_SWAP_EXACT_OUT
 0x0a PERMIT2_PERMIT       0x0b WRAP_ETH            0x0c UNWRAP_WETH
 0x0d PERMIT2_TRANSFER_FROM_BATCH                   0x0e BALANCE_CHECK_ERC20
-0x10 V4_SWAP              0x13 V4_INITIALIZE_POOL  0x14 V4_POSITION_MANAGER_CALL
-0x21 EXECUTE_SUB_PLAN
+0x10 V4_SWAP              0x11 V3_POSITION_MANAGER_PERMIT  0x12 V3_POSITION_MANAGER_CALL
+0x13 V4_INITIALIZE_POOL   0x14 V4_POSITION_MANAGER_CALL    0x21 EXECUTE_SUB_PLAN
 ```
 
-**Единственная типизированная подпись здесь — `0x0a PERMIT2_PERMIT`.** Роутер не проверяет
-её сам, а пересылает в Permit2:
+🔴 **ПОПРАВКА 2026-08-15, снята мной же.** Первая редакция этого абзаца говорила
+«единственная типизированная подпись здесь — `0x0a PERMIT2_PERMIT`». Это **неполно**.
+Тогда я прочитал только ветки свопа и Permit2 и честно пометил остальные как непроверенные
+(§«Границы»); при полном разборе всех 23 команд нашлись ещё две подписные ветки и
+рекурсия. Верный список — `SPEC-uniswap-signature-surfaces.md` §1:
+
+- `0x0a PERMIT2_PERMIT` и `0x03 PERMIT2_PERMIT_BATCH` — в Permit2;
+- **`0x11 V3_POSITION_MANAGER_PERMIT` — ERC-721 permit в v3 NonfungiblePositionManager,
+  совсем другой домен**;
+- `0x21 EXECUTE_SUB_PLAN` — исполняет вложенный набор команд, в котором может быть любая
+  из трёх выше.
+
+Абзац ниже оставлен как есть, потому что про `0x0a` он верен; неверным было слово
+«единственная».
+
+**`0x0a PERMIT2_PERMIT`.** Роутер не проверяет подпись сам, а пересылает в Permit2:
 
 ```solidity
 address(PERMIT2).call(abi.encodeWithSignature(

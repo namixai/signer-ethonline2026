@@ -8,11 +8,57 @@ not to pick a favourite.
 ## Run it
 
 ```bash
-python3 verify_ours.py     # path A — our own encoder, standard library only
-python3 falsify.py         # six deliberate defects; every one must be caught
+# Permit2 — the ERC-20 side
+python3 verify_ours.py          # path A — our own encoder, standard library only
+python3 falsify.py              # six deliberate defects; every one must be caught
 npm ci && node verify_sdk.mjs   # path B — Uniswap's own SDK, plus viem
-./anchor_onchain.sh        # optional, needs network + foundry: ask the deployed contracts
+
+# Position NFTs — the other signature in the swap path
+python3 verify_nft_ours.py      # path A, and it also checks the pinned on-chain domains
+python3 falsify_nft.py          # seven mutations
+node verify_nft_sdk.mjs         # path B — viem
+
+./anchor_onchain.sh             # optional, needs network + foundry: ask the deployed contracts
+node onchain_fieldorder.mjs     # optional, needs network: let Permit2 judge our field order
 ```
+
+## The one thing the offline paths cannot check
+
+Both of them take the ORDER of fields inside a struct from the same reading of the same type
+string. Concatenate `nonce` before `tokenId` and both paths agree, both are wrong, and the
+type hash does not help — it hashes the type *string*, which was never the broken part.
+
+On 2026-08-15 a live Hyperliquid order was rejected for exactly this: field order inside the
+signed action differed from canonical (`s` before `r`), the venue rebuilt the payload its own
+way, and recovery returned a different address. Valid signature, wrong bytes, no useful error.
+
+`onchain_fieldorder.mjs` closes it by letting the deployed Permit2 be the judge. Our encoder
+produces a digest, a throwaway key signs it, and `permit()` is simulated via `eth_call`:
+the contract recovers a signer from *its* digest and compares. Accepted means it rebuilt the
+same bytes we did. Then the negative — transpose `expiration` and `nonce`, both `uint48`, so
+the type string, the type hash and every width stay correct and only the order moves — and
+the contract answers `InvalidSigner`. Read-only throughout; nothing is broadcast.
+
+Not covered by that: field order in the position-NFT permits. Permit2 accepts any `owner`
+argument, so it can be probed; the NFT contracts read `ownerOf(tokenId)`, which would need a
+real position held by the probe key. Those have the offline transposition mutation and no
+contract-side confirmation, and the spec says so rather than implying otherwise.
+
+## Two families, and why they are separate files
+
+`permit2-*` covers the ERC-20 side. `nft-*` covers the position-NFT permits of Uniswap v3
+and v4 — the *other* signature that can ride inside an ordinary swap transaction, forwarded
+by UniversalRouter command `0x11`.
+
+They are kept apart rather than generalised into one encoder on purpose: the Permit2 set is
+already merged and CI-green, and it earns its keep as a regression anchor. Folding it into a
+shared abstraction to save a few lines would put the anchor and the new work in the same
+blast radius.
+
+The single fact that makes the NFT set worth having: **v3 and v4 share the struct type hash
+`0x49ecf333…` and disagree about the domain** — v3's has a `version` field, v4's does not.
+Same struct hash, different digest. A "the type hash matches" check passes and proves
+nothing.
 
 The first two need nothing but Python 3. No network, no packages, no Ethereum library.
 `npm ci` needs the network once; after that path B runs offline too.

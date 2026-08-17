@@ -24,16 +24,23 @@ policy-applied-before-signature on CEX venues were all built between May and Jul
 They are public and independently checkable at
 [namixai/signer](https://github.com/namixai/signer).
 
-**Research done in August, before the window, is in this repository under its real dates.**
-That means the three specs in `specs/` and the whole of `vectors/`, all dated 2026-08-14,
-plus the earlier August specs imported as the window opens. They are research and test
-material — not submission code. The reason they exist early is dull: reading four protocol
-repositories carefully takes longer than nine days leaves room for, and guessing instead
-produces integrations that sign the wrong bytes.
+**And the signing path has now run end to end on a real venue.** On 16 August 2026, against
+a policy compiled into the enclave image and covered by its attestation, the enclave signed
+an order of 0.010 BNB under a 0.041 cap and refused one of 0.050 with `policy_denied`. Later
+the same day Hyperliquid accepted an order signed by the enclave and accepted the cancel
+afterwards. The order rested and never filled: this was a liveness test, not a trade.
 
-**The integrations are written in the window, from scratch, already knowing how.** So are
-the verifier page, the demo, and the submission README. The August prototypes are named in
-`CONTINUITY.md` and do not ship as code.
+The key is generated inside the enclave and leaves it only as a KMS-wrapped blob that
+nothing but the enclave can open. One human action sits in the path and we are not going to
+write around it — the account had to approve the enclave's address once, on chain, before
+the venue would accept anything it signed. After that approval no human approved the order
+and no human touched the key.
+
+**What that is not.** Our own account and our own money, so nobody has trusted us with
+theirs yet. No external audit. Order signing has run on two venues — Binance Futures since
+27 July, Hyperliquid since 16 August — and that is the whole list. First only in the sense
+of our own first; the rules we hold ourselves to are in `CONTINUITY.md`, and one of them
+forbids the other reading.
 
 Nothing here is renamed or backdated. The Continuity track allows pre-existing work;
 concealing it would be both a rule violation and a pointless one, since commit dates outlive

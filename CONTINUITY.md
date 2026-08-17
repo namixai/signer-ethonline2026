@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-08-14.
+**Last updated:** 2026-08-16 (demo storyboard + runnable script).
 
 ## The position in one sentence
 
@@ -24,6 +24,7 @@ Knowledge gathered before the event is not hidden — it is here, dated.
 | **`sign_data`** — data signed by a separate attested key | designed 06.2026, implemented in the main lane | design documents in the repository |
 | **attested-snapshot** — a signed market snapshot | schema contract v2, July 2026 | contract + public verification page |
 | **Policy before signature** — limits applied in the enclave before signing | in production on CEX venues | sources |
+| **A live signing cycle on a real venue** — key generated inside the enclave, attested policy with a cap, an order accepted by the venue and a cancel accepted | 2026-08-16, on Hyperliquid. Same morning, same policy: 0.010 BNB signed under the 0.041 cap, 0.050 refused with `policy_denied`. The accepted order rested and never filled | our own account and our own money; no external audit; two venues, Binance Futures since 27 July and Hyperliquid since 16 August; one human action in the path — the account approved the enclave's address on chain, once |
 
 ## What was written in August, BEFORE the window
 
@@ -44,6 +45,9 @@ without it the integrations written in the window would be guesswork.
 | **2026-08-14** | **Uniswap execution path** — the swap is not signed; `executeSigned` from the router's `main` branch is not deployed at the live addresses | knowledge and spec (`specs/`) |
 | **2026-08-14** | **Permit2 test vectors** — 11 cases, two independent implementations, an on-chain anchor, six falsification mutations | bench (`vectors/`), does not ship as submission code |
 | **2026-08-14** | this repository created, with the August material imported under its real dates | disclosure, which is the point |
+| **2026-08-15** | **every signature surface in the swap path enumerated** — all 23 router commands classified; three forward a signature and a fourth nests; v3 and v4 position-NFT permits share a type hash and disagree about the domain | knowledge and spec (`specs/`) |
+| **2026-08-16** | **the enclave signed an order Hyperliquid accepted, and the cancel was accepted**; the same policy signed 0.010 BNB under the cap and refused 0.050 | product milestone, not hackathon work — the signing path predates the event |
+| **2026-08-15** | **position-NFT permit vectors** — 7 cases, two paths, every domain separator anchored against the deployed contract, 7 falsification mutations | bench (`vectors/`), does not ship as submission code |
 
 ## What will be written IN THE WINDOW (from 4 September)
 
@@ -61,7 +65,11 @@ without it the integrations written in the window would be guesswork.
 | `specs/SPEC-permit2-signature-transfer.md` | 2026-08-14 |
 | `specs/SPEC-uniswap-execution-path.md` | 2026-08-14 |
 | `specs/SPEC-enclave-guarantee-boundary.md` | 2026-08-14 |
-| `vectors/` (cases, both verifiers, falsification, on-chain anchor) | 2026-08-14 |
+| `vectors/` — Permit2 family (cases, both verifiers, falsification, on-chain anchor) | 2026-08-14 |
+| `specs/SPEC-uniswap-signature-surfaces.md` | 2026-08-15 |
+| `vectors/` — position-NFT family (`nft-*`) | 2026-08-15 |
+| `vectors/onchain_fieldorder.mjs` — field order judged by the deployed Permit2 | 2026-08-16 |
+| `demo/STORYBOARD-hyperliquid.md` + `demo/demo.sh` — three frames, runnable rather than filmed | 2026-08-16 |
 | the Fusion, Permit2 and attestation specs of 2026-08-05, and the verifier-page spec of 2026-08-08 | imported as the window opens |
 
 ## Rules we hold ourselves to
@@ -82,4 +90,12 @@ without it the integrations written in the window would be guesswork.
   and a live Hyperliquid integration, and has raised more than $65M. **We are not first.**
   Any uniqueness claim survives exactly one search, and takes the credibility of everything
   around it when it goes.
+- **We say what the live run does not cover.** The Hyperliquid cycle of 2026-08-16 ran on
+  our own account with our own money, has had no external audit, covers two venues in total,
+  and required one on-chain approval from the account before the venue would accept anything
+  the enclave signed. Stating the milestone without those qualifications next to it would be
+  the same overreach as any other unqualified claim.
+- **We do not stitch two runs into one.** The cap probes and the venue-accepted order happened
+  in separate runs on the same day; describing them as one continuous unattended cycle would
+  be a small lie that a reader with the timestamps could catch.
 - **Dates do not move.** If a component existed before the event, it says so.
