@@ -19,7 +19,7 @@ Knowledge gathered before the event is not hidden — it is here, dated.
 | component | state before | public confirmation |
 |---|---|---|
 | **Signer enclave** — signing inside AWS Nitro, key never leaves | in development since May 2026, live service | public build repository, reproducible PCR0 |
-| **Reproducible build + attestation** | PCR0 rebuilds from a clean clone; a live NSM COSE document is served | `signer-demo.usenami.io/attestation` |
+| **Reproducible build + attestation** | PCR0 rebuilds from a clean clone; a live NSM COSE document is served | `signer-demo.usenami.io/attestation` — **the demo box**. We run more than one enclave; ask this one and you are asking the demo lane, not the production lane. Whether a measurement is registered is a question for the chain: `isPCR0Active` on the registry contract, on Base. |
 | **EIP-712 signing (Hyperliquid)** | in production | sources in the public repository |
 | **`sign_data`** — data signed by a separate attested key | designed 06.2026, implemented in the main lane | design documents in the repository |
 | **attested-snapshot** — a signed market snapshot | schema contract v2, July 2026 | contract + public verification page |
