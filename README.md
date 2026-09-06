@@ -64,8 +64,10 @@ find out.**
 
 - **Offline, one command, nothing needed from anyone.** `python3 verify_ours.py` and
   `python3 falsify.py` use the standard library only: no account, no key, no network. The
-  second one plants six deliberate defects and every one must be caught — a suite that only
-  proves the right answer passes just as happily when both sides share a mistake.
+  second one plants deliberate defects and every one must be caught — a suite that only
+  proves the right answer passes just as happily when both sides share a mistake. The run
+  prints how many; we deliberately do not repeat the number here, because a count in prose
+  goes stale the moment someone adds a case, and this one already had.
 - **Against Uniswap's own SDK, which needs the network once.** `npm ci && node verify_sdk.mjs`
   downloads viem and the Permit2 SDK. It is worth running because it checks our encoder
   against theirs rather than against itself, but it is not the one-command claim, and

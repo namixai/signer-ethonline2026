@@ -10,7 +10,7 @@ not to pick a favourite.
 ```bash
 # Permit2 — the ERC-20 side
 python3 verify_ours.py          # path A — our own encoder, standard library only
-python3 falsify.py              # six deliberate defects; every one must be caught
+python3 falsify.py              # planted defects; every one must be caught (the run prints the count)
 npm ci && node verify_sdk.mjs   # path B — Uniswap's own SDK, plus viem
 
 # Position NFTs — the other signature in the swap path
