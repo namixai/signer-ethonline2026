@@ -1,0 +1,4 @@
+
+# integrations/graph is a Node package; its installed dependencies are not part of the
+# submission and must never be committed.
+integrations/graph/node_modules/
