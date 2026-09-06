@@ -109,6 +109,9 @@ JSON
   note "HTTP $(printf '%s' "$out" | tail -1) — expected 403, rule_class=policy"
 }
 
+PCR0_REGISTRY="${PCR0_REGISTRY:-0x38b42eED740b0fDeb211bBDf773F2238cAEec240}"
+BASE_RPC="${BASE_RPC:-https://mainnet.base.org}"
+
 run_frame_3() {
   bar "FRAME 3 — a stranger checks the running code themselves"
   note "Nothing here needs an account, a token, or our permission. This is the frame"
@@ -119,14 +122,40 @@ run_frame_3() {
   note "fresh nonce: ${nonce}   (the document is bound to it, so a replay is visible)"
 
   doc=$(curl -s -D /tmp/.demo_hdr --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
-  printf '%s' "$doc" | python3 -c '
+  local pcr0
+  pcr0=$(printf '%s' "$doc" | python3 -c '
 import sys,json
 d=json.load(sys.stdin)
-print("   pcr0_sha384        :", d.get("pcr0_sha384"))
-print("   registered_onchain :", d.get("registered_onchain"))
-print("   attestation_doc    : <%d chars of NSM-signed COSE> (not printed)" % len(d.get("attestation_doc_b64") or ""))
-'
+print("   pcr0_sha384        :", d.get("pcr0_sha384"), file=sys.stderr)
+print("   attestation_doc    : <%d chars of NSM-signed COSE> (not printed)" % len(d.get("attestation_doc_b64") or ""), file=sys.stderr)
+print(d.get("pcr0_sha384") or "")
+')
   note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
+  note ""
+
+  # We deliberately do NOT print `registered_onchain` from the response. That field is read
+  # from an environment variable on the gateway, so it reports what the operator configured
+  # — it is our word about ourselves. The question "is this measurement registered" has an
+  # answer that owes us nothing, and this is it.
+  note "Is that measurement registered on chain? Ask the registry, not us:"
+  printf '   cast call %s "isPCR0Active(bytes)(bool,address)" 0x%s --rpc-url %s\n' \
+    "$PCR0_REGISTRY" "$pcr0" "$BASE_RPC"
+  if command -v cast >/dev/null 2>&1 && [ -n "$pcr0" ]; then
+    cast call "$PCR0_REGISTRY" "isPCR0Active(bytes)(bool,address)" "0x${pcr0}" --rpc-url "$BASE_RPC" \
+      2>/dev/null | sed 's/^/   /' \
+      || note "(registry call failed — that is a could-not-check, not a false)"
+  else
+    note "(install foundry to run it here; the command above is the whole check)"
+  fi
+  note "Both lines matter: false, or a different owner, means stop."
+  note ""
+  note "⚠️ Read that answer with one fact in hand: the registry keeps ONE active"
+  note "measurement PER OWNER, so registering a second enclave under the same owner"
+  note "deprecates the first in the same transaction. If this returns false while the"
+  note "service is healthy, the likely reason is that another of our lanes currently"
+  note "holds the registration — not that the code is unverified. The rebuild check in"
+  note "VERIFY-SIGNER-YOURSELF.md does not depend on the registry at all, and that is"
+  note "the one we would rather be judged on."
   note ""
   note "What a viewer does next, and what it costs them: rebuild the image from the"
   note "public clone and compare PCR0. That procedure is VERIFY-SIGNER-YOURSELF.md in"
