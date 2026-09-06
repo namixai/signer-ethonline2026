@@ -129,8 +129,11 @@ checkable. It is the integrator-side conclusion we would have liked to read some
   CREATE2). Deployment addresses that differ per network are a steady source of
   misconfiguration, and not having that problem is worth more than it sounds.
 
-  ⚠️ We first wrote "on every chain" here, and that claims more than CREATE2 gives:
-  the salt fixes the *address*, someone still has to deploy. Confirm before you rely on it —
+  ⚠️ We first wrote "on every chain" here, and that claims more than CREATE2 gives. Per
+  EIP-1014 the address is derived from **three** inputs — the deployer address, the salt,
+  and the hash of the init code — so keeping all three identical is what reproduces the
+  address on another chain. It is a recipe, not a guarantee that anyone has followed it:
+  someone still has to deploy. Confirm before you rely on it —
   `cast code 0x000000000022D473030F116dDEE9F6B43aC78BA3 --rpc-url "$RPC"` returning `0x`
   means it is not there.
 - **`DOMAIN_SEPARATOR()` is public.** Being able to check our construction against the
