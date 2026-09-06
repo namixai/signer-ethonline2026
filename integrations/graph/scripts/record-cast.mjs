@@ -1,0 +1,88 @@
+// Records `node src/demo.js` as an asciicast v2 file.
+//
+// Why this exists: the submission needs a 2–4 minute screen recording, and I have neither
+// a screen nor a microphone. An asciicast is the closest real artifact I can produce — a
+// replayable terminal recording with true timings that marketing can play at any size,
+// screen-capture, or embed, and re-record for free whenever the walkthrough changes.
+//
+// The timings are the REAL ones from the run. `DEMO_STEP_PAUSE_MS` paces the STEPS for
+// readability; it does not fake network latency, and the live calls take as long as they
+// take either way.
+
+import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { StringDecoder } from 'node:string_decoder';
+import { isMain } from '../src/is-main.js';
+
+/**
+ * 🔴 STREAM CHUNKS DO NOT RESPECT CHARACTER BOUNDARIES.
+ *
+ * `chunk.toString()` is wrong whenever a multi-byte sequence straddles the boundary: the
+ * tail of one chunk and the head of the next each decode to U+FFFD. Every Cyrillic letter
+ * in this walkthrough is two bytes and every box-drawing rule is three, so it is built
+ * almost entirely out of characters that can be split.
+ *
+ * It did NOT corrupt the recording we already had — those chunks happened to land on
+ * boundaries — and that is exactly why it was worth fixing: it works until it doesn't, and
+ * the failure surfaces as mangled Russian inside a published video.
+ *
+ * StringDecoder holds an incomplete sequence back until the next chunk completes it.
+ */
+export function createCollector(push) {
+  const decoder = new StringDecoder('utf8');
+  return {
+    write: (chunk) => {
+      const text = decoder.write(chunk);
+      if (text) push(text);
+    },
+    end: () => {
+      const rest = decoder.end();
+      if (rest) push(rest);
+    },
+  };
+}
+
+export function record({ out = 'demo.cast', cols = 100, rows = 34 } = {}) {
+  const started = process.hrtime.bigint();
+  const events = [];
+  const at = () => Number(process.hrtime.bigint() - started) / 1e9;
+
+  const child = spawn('node', ['src/demo.js'], {
+    env: { ...process.env, FORCE_COLOR: '1', COLUMNS: String(cols) },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  const collectors = [];
+  for (const stream of [child.stdout, child.stderr]) {
+    const c = createCollector((text) => events.push([at(), 'o', text]));
+    collectors.push(c);
+    stream.on('data', c.write);
+  }
+
+  return new Promise((resolve) => {
+    child.on('close', (code) => {
+      for (const c of collectors) c.end(); // flush anything held back mid-sequence
+      const header = {
+        version: 2,
+        width: cols,
+        height: rows,
+        timestamp: Math.floor(Date.now() / 1000),
+        title: 'graph-snapshot — производящая половина слоя 3b-1',
+        env: { SHELL: '/bin/zsh', TERM: 'xterm-256color' },
+      };
+      writeFileSync(out, JSON.stringify(header) + '\n' + events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+      resolve({ out, events: events.length, duration: events.length ? events[events.length - 1][0] : 0, code });
+    });
+  });
+}
+
+// Only record when run directly — importing this file must not spawn anything.
+if (isMain(import.meta.url)) {
+  const r = await record({
+    out: process.argv[2] ?? 'demo.cast',
+    cols: Number(process.env.CAST_COLS ?? 100),
+    rows: Number(process.env.CAST_ROWS ?? 34),
+  });
+  console.log(`${r.out}: ${r.events} событий, ${r.duration.toFixed(1)} с, код выхода ${r.code}`);
+  process.exitCode = r.code;
+}
