@@ -27,7 +27,7 @@ the first — because its on-chain rejection actively points away from the cause
 
 Permit2's EIP-712 domain is:
 
-```
+```text
 EIP712Domain(string name,uint256 chainId,address verifyingContract)
 name = "Permit2"
 ```
@@ -48,7 +48,7 @@ expect it is a common hour.
 
 ## 2. A nested struct enters as its own hash, and the type string is a concatenation
 
-```
+```text
 PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)
 
 PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)
@@ -81,12 +81,28 @@ an account, or a testnet — the domain separator is readable straight from the 
 contract:
 
 ```bash
-cast call 0x000000000022D473030F116dDEE9F6B43aC78BA3 "DOMAIN_SEPARATOR()(bytes32)" \
-  --rpc-url https://ethereum-rpc.publicnode.com
+# Use the RPC of the chain you will actually sign for — the separator is chain-specific.
+RPC=https://mainnet.base.org
+cast call 0x000000000022D473030F116dDEE9F6B43aC78BA3 "DOMAIN_SEPARATOR()(bytes32)" --rpc-url "$RPC"
+cast chain-id --rpc-url "$RPC"   # must equal the chainId you put in your own domain
 ```
 
 Comparing that against a locally computed separator is a five-second check that catches
 trap 1 outright, and it needs nothing from anyone.
+
+⚠️ **Query the chain you are signing for, not mainnet.** `DOMAIN_SEPARATOR()` is built from
+`block.chainid`, so each deployment returns a different value and a mainnet answer proves
+nothing about a Base signature. Measured on 4 September 2026, same address on all three:
+
+```text
+Ethereum     chainId 1      0x866a5aba21966af9…
+Base         chainId 8453   0x3b6f35e4fce979ef…
+World Chain  chainId 480    0x7bbefd3f28aeae36…
+```
+
+We only noticed because we cross-checked the chain id rather than assuming the address
+being identical meant the answer would be. **This is worth a line in the docs**: the
+constant address is exactly what makes it easy to forget the separator is not constant.
 
 **We also kept a negative control**, which we would recommend to anyone doing this: sign the
 same payload under a deliberately *wrong* domain and assert the digest differs. A test that
@@ -109,9 +125,14 @@ checkable. It is the integrator-side conclusion we would have liked to read some
 
 ## What worked well
 
-- **One address on every chain** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`, CREATE2).
-  Deployment addresses that differ per network are a steady source of misconfiguration, and
-  not having that problem is worth more than it sounds.
+- **The same address wherever it is deployed** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`,
+  CREATE2). Deployment addresses that differ per network are a steady source of
+  misconfiguration, and not having that problem is worth more than it sounds.
+
+  ⚠️ We first wrote "on every chain" here, and that claims more than CREATE2 gives:
+  the salt fixes the *address*, someone still has to deploy. Confirm before you rely on it —
+  `cast code 0x000000000022D473030F116dDEE9F6B43aC78BA3 --rpc-url "$RPC"` returning `0x`
+  means it is not there.
 - **`DOMAIN_SEPARATOR()` is public.** Being able to check our construction against the
   contract, with no key and no transaction, is what made trap 1 findable at all.
 - **The separation of allowance from transfer** is the property our product depends on: an
