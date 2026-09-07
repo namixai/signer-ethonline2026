@@ -47,9 +47,20 @@ export function checkUsable(body, wantSymbol, chainHead, limit = STALENESS_LIMIT
   // из checkUsable мимо контракта — при том что для блока ЦЕНЫ это правило уже
   // сформулировано ниже. Правило было и применялось к одному из двух. Замерено: бросали
   // оба, и кривой chainHead тоже.
+  // 🔴 07.09: и этого оказалось мало — блок ЦЕНЫ всё ещё шёл мимо, а отрицательные не
+  // отсекались нигде. Теперь через `asBlock` идут ВСЕ ТРИ поля: chainHead, блок меты и
+  // блок цены. Если появится четвёртое — оно обязано идти сюда же, иначе этот же дефект
+  // вернётся четвёртый раз.
   const asBlock = (v) => {
     if (v === undefined || v === null || v === '' || typeof v === 'boolean') return null;
-    try { return BigInt(v); } catch { return null; }
+    let n;
+    try { n = BigInt(v); } catch { return null; }
+    // 🔴 A NEGATIVE BLOCK IS NOT A SMALL BLOCK — it is malformed, and it FLATTERS every
+    // bound it touches. With chainHead 100n, `meta.block.number = -1` reports a lag of
+    // 101n and sails under a 200n limit as "fresh". Block heights are non-negative by
+    // construction, so this is a refusal, not a clamp: clamping to 0n would invent a
+    // reading nobody sent. Measured 2026-09-07 — it was accepted before this line.
+    return n < 0n ? null : n;
   };
   const head = asBlock(chainHead);
   if (head === null) return fail('bad_chain_head', { chainHead: String(chainHead) });
@@ -79,10 +90,12 @@ export function checkUsable(body, wantSymbol, chainHead, limit = STALENESS_LIMIT
   if (token.lastPriceBlockNumber == null) {
     return fail('missing_last_price_block');
   }
-  let priceBlock;
-  try {
-    priceBlock = BigInt(token.lastPriceBlockNumber);
-  } catch {
+  // 🔴 THROUGH asBlock, like the other two — this rule has now been written three times
+  // for a subset of the fields it covers. The comment above literally says "правило было
+  // и применялось к одному из двух", and this path still went straight to BigInt: so
+  // `true` became 1n and passed, and `''` became 0n. Both measured, neither supposed.
+  const priceBlock = asBlock(token.lastPriceBlockNumber);
+  if (priceBlock === null) {
     return fail('bad_last_price_block', { value: String(token.lastPriceBlockNumber) });
   }
 
