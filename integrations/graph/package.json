@@ -1,0 +1,22 @@
+{
+  "name": "@usenami/graph-snapshot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reads Uniswap V3 market data from The Graph, verifies the indexer attestation (response bytes, deployment, signer, on-chain allocation), assembles a canonical signable snapshot and applies the rule that follows from it, and refuses a signature request for an agent that does not resolve to a registered human. Signature SUBMISSION is not implemented: signing the snapshot needs an enclave data key that is not provisioned here.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "drift": "node src/drift.js",
+    "quote": "node src/quote.js",
+    "drift:world": "node src/world-drift.js",
+    "demo": "node src/demo.js",
+    "demo:cast": "node scripts/record-cast.mjs demo.cast",
+    "test:offline": "GRAPH_SNAPSHOT_OFFLINE=1 node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@x402/evm": "^2.24.0",
+    "@x402/fetch": "^2.24.0",
+    "viem": "^2.56.3"
+  }
+}

@@ -59,7 +59,44 @@ scripts/       scrub-check.sh, the hygiene gate that runs in CI
 ```
 
 Start with `vectors/README.md` if you want to check something rather than read something.
-It runs in one command and needs no account, no key and no network.
+**There are two paths, and they cost different things — we would rather say so than have you
+find out.**
+
+- **Offline, one command, nothing needed from anyone.** `python3 verify_ours.py` and
+  `python3 falsify.py` use the standard library only: no account, no key, no network. The
+  second one plants deliberate defects and every one must be caught — a suite that only
+  proves the right answer passes just as happily when both sides share a mistake. The run
+  prints how many; we deliberately do not repeat the number here, because a count in prose
+  goes stale the moment someone adds a case, and this one already had.
+- **Against Uniswap's own SDK, which needs the network once.** `npm ci && node verify_sdk.mjs`
+  downloads viem and the Permit2 SDK. It is worth running because it checks our encoder
+  against theirs rather than against itself, but it is not the one-command claim, and
+  `onchain_fieldorder.mjs` additionally talks to a chain.
+
+An earlier version of this line said the whole thing runs in one command with no network.
+That was true of the first path and not the second, and we corrected it rather than leave a
+reader to discover the gap.
+
+## Code
+
+`integrations/graph/` — the reading and verification code, written during the event window
+(2026-09-02..05). Node, no build step:
+
+```bash
+cd integrations/graph && npm ci && npm test    # the run prints the count
+npm run demo                                    # the whole walkthrough, ~2.6 min
+```
+
+What it does, in the order the walkthrough shows it: ask The Graph's keyless x402 gateway
+for a price, verify the indexer's attestation over the **exact** response bytes, resolve the
+allocation to a staked indexer on chain, decide separately whether the reading is *usable*,
+assemble a canonical snapshot that states what was **not** checked as well as what was, and
+apply the rule that follows from it. Plus the gate that refuses a signature to an agent with
+no registered human behind it.
+
+⚠️ **Where it runs:** outside the enclave. An enclave has no network, so none of this can
+happen inside one. The claim is "checked before a signature was requested", never "enclave
+policy".
 
 ## Specs
 
