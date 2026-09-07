@@ -148,6 +148,12 @@ policy".
 | `specs/SPEC-uniswap-execution-path.md` | Where a Uniswap swap is signed and where it is only calldata; verified addresses on Ethereum and Base |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
 
+⚠️ **The specs are in Russian.** They are internal working documents, published as they were
+written rather than tidied up for an audience — translating them after the fact would make
+them read as material prepared for judging, which is not what they are. The code, its
+output and `integrations/graph/README.md` are in English, because that is the path a
+reader follows to check something rather than read something.
+
 ## Verify the product itself, not just this repo
 
 The interesting claim is not in this repository. It is that you can rebuild the enclave

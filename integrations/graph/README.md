@@ -1,218 +1,239 @@
-# graph-snapshot — производящая половина слоя 3b-1
+# graph-snapshot — the producing half of the policy input
 
-Читает рынок Uniswap V3 из The Graph, **проверяет аттестацию индексатора** и собирает
-канонический снимок для политики Signer.
+Reads the Uniswap V3 market from The Graph, **verifies the indexer's attestation**, and
+assembles a canonical snapshot for Signer's policy.
 
-Образцы, на которых всё проверяется, лежат рядом: `test/fixtures/`. Два из них — **живые
-оплаченные ответы** (01.09 и 04.09), сохранённые побайтово; тест утверждает, что их хеш
-сходится с `responseCID`, который подписал индексатор.
+The samples everything is checked against sit next to the code, in `test/fixtures/`. Two of
+them are **live paid answers** (1 and 4 September), kept byte for byte; a test asserts their
+hash matches the `responseCID` the indexer signed.
 
-⚠️ Спецификация и набор векторов, из которых это выросло, — **внутренние документы и не
-опубликованы**. Здесь на них нет ссылок нарочно: путь, который читатель не может открыть,
-хуже отсутствия ссылки. Всё, что нужно для проверки кода, есть в этом каталоге.
+⚠️ The specification and the vector set this grew out of are **internal documents and are
+not published**. There are deliberately no links to them here: a path a reader cannot open
+is worse than no link at all. Everything needed to check this code is in this directory.
 
-    npm ci && npm test          # число тестов печатает прогон, а не этот файл
-    npm run quote               # спросить цену у шлюза БЕСПЛАТНО (402 ничего не стоит)
-    npm run drift               # сторож адресов The Graph, нужна сеть
-    npm run drift:world         # сторож адреса AgentBook, нужна сеть
-    npm run leverage            # один запрос на несколько деплоёв стандартной схемы
-    npm run test:offline        # без сети: живые тесты пропускаются ПОИМЁННО, а не молча
-
----
-
-## Два шага, и второй НЕ следует из первого
-
-**1. Подпись** (`src/attestation.js`) — `responseCID` считается от **точных байтов как
-пришли**, затем собирается EIP-712 дайджест и восстанавливается адрес подписанта.
-
-**2. Пригодность** (`src/usability.js`) — отдельно.
-Образец 2 в фикстуре это **корректно аттестованный ответ с ошибкой GraphQL и без данных**,
-оплаченный как обычный. «Подпись сошлась» ≠ «цена получена». Предикаты: нет `errors`
-(наличие — **отказ**, не предупреждение) · `data` непусто · `hasIndexingErrors == false` ·
-свежесть источника против головы цепи · цена найдена и **не `"0"`** (у хвоста токенов ноль
-законен и для эталона непригоден) · **отдельно** свежесть самой цены.
-
-⚠️ **У данных два разных возраста.** Свежая голова субграфа не оправдывает годовалую цену:
-цена пишется внутри обработчиков событий, и на мёртвом рынке они не срабатывают, а
-индексация остаётся зелёной. Оба возраста ограничиваются независимо.
-
-## Чего этот код НЕ утверждает
-
-`src/chain.js` резолвит адрес подписанта в индексатора со ставкой — **ончейн-запросом**.
-Энклав так не может: у него нет сети. Поэтому
-
-- **аттестация не является якорем доверия энклава**, она кладётся в снимок как **артефакт
-  для независимой перепроверки**;
-- якорем остаётся **наша** подпись, и мы отвечаем за то, что цепочку проверили.
-
-Подробнее — раздел о границе доверия в спеке.
-
-🔴 **`requestCID` намеренно не проверяется.** Его прообраз нам неизвестен: четыре
-правдоподобные кодировки известного запроса не воспроизвели значение из образца. Заявлять
-проверку, которую нельзя выполнить, — ритуал, а не гарантия.
-
-🔴 **Адреса The Graph переехали с Horizon.** Пре-Horizon `DisputeManager` теперь
-`LegacyDisputeManager`, и с ним восстанавливается **другой адрес — молча, без ошибки**
-(тест это фиксирует). Всё запечённое требует сторожа, чья тревога **отличима от отказа
-политики**.
-
-## Состояние
-
-| часть | статус |
-|---|---|
-| проверка аттестации | ✅ работает, 12 тестов на боевых образцах |
-| проверка пригодности | ✅ работает |
-| резолв индексатора ончейн | ✅ проверен живым запросом |
-| клиент x402 | ✅ написан на `@x402/fetch`; бесплатный `quote` проверен живьём |
-| платный запрос | ⏳ **гейт Alex** — трата денег, разрешение только от него |
-| подпись снимка | ⏳ нужен ключ подписи данных — операторский шаг лейна сингера |
-| сторож адресов The Graph | ✅ `npm run drift`, проверен против живой адресной книги |
-| резолв агент → человек (World) | ✅ `src/world.js`, 24 теста, живое чтение AgentBook проходит |
-| сторож адреса AgentBook | ✅ `npm run drift:world`, ончейн + константа официального клиента |
-| вектора Permit2 | ✅ все четыре воспроизведены, домен сверен с задеплоенным контрактом |
-
-## Тесты фальсифицированы, а не просто зелёные
-
-Каждый подсаженный дефект обязан краснеть **в том тесте, который его утверждает**.
-Проверено: сломанный `normaliseV`, `errors` как предупреждение, снятая проверка возраста
-цены — каждый даёт ровно один красный.
-
-🔴 **Первый заход поймал ложно-зелёный у меня самого:** тест «raw v нормализуется» проходил
-и со сломанной нормализацией, потому что `viem` сам понимает `v: 0`. Тест утверждал не то,
-что проверял. Разделён на юнит-тест функции и сквозной; комментарий, который это
-преувеличивал, переписан.
-
-## Сторож запечённых адресов
-
-`npm run drift` сравнивает запечённые адреса The Graph с их живой адресной книгой.
-**Три исхода, и они не схлопываются в два:** `0` — дрейфа нет, `1` — дрейф найден,
-`2` — **проверить не удалось**. Последнее намеренно не равно «дрейфа нет».
-
-Это и есть требование спеки, которое ревью поймало ненаписанным: у запечённого обязан
-быть сторож, чья тревога **отличима от отказа политики**. Иначе миграция протокола
-читается как «подпись не сошлась».
-
-⚠️ Сторож поймал ловушку на себе же: `packages/address-book/src/subgraph-service/addresses.json`
-в git — **симлинк**, и сырая выдача даёт путь-цель вместо JSON. Он честно сказал «не смог
-проверить», а не «дрейфа нет». URL исправлен на настоящий файл.
-
-## Вектора Permit2 (Uniswap)
-
-`src/permit2.js` делает спеку `SPEC-permit2-eip712.md` **запускаемой**. Каталог `vectors/`
-в сабмит-репо был **пуст**, при том что на спеку ссылались как на «частично
-провалидировано» — вектор, который нельзя запустить, ничего не подтверждает.
-
-Все четыре эталона воспроизведены от первых принципов, и **домен сверен с задеплоенным
-контрактом** (`DOMAIN_SEPARATOR()`, бесплатный `eth_call`), а не только с нашей арифметикой.
-
-⚠️ **Домен Permit2 — ТРИ поля, без `version`.** Привычный четырёхполевой даёт подпись,
-которую контракт отвергает как `InvalidSigner` — то есть жалуется на **ключ**, а не на
-домен. Негативный контроль на это стоит отдельным тестом, как требует спека.
-
-⚠️ **Метка типа не защищает.** `uint160` и `uint256` кодируются в одно и то же 32-байтное
-слово, поэтому подмена метки **невидима**. Опасна только упаковка в 20 байт — на неё
-отдельный тест, и он проверен тем, что при правильной ширине **падает**.
-
-⚠️ **Неполная политика — отдельный исход, а не отказ.** Нет allow-листа или потолка ⇒
-`policy_required`, как `POLICY_REQUIRED` у энклава. Схлопывать это в «не разрешено» значит
-читать «правила сказали нет» там, где правды «правил ещё нет», — и такое никто не идёт чинить.
-
-🔴 **Это сборка дигеста, не подпись.** Подписи Permit2 внутри энклава нет: ей нужно своё
-действие, которого пока не существует. Писать «Signer подписывает Permit2» до этого —
-ложь в публичном сабмите.
-
-## Субграф, который мы читаем, — стандартизованный по Messari
-
-Выяснилось 07.09, и не потому что искали: идентификатор в `src/fetch.js` побайтово равен
-тому, что реестр деплоев Messari числит за `uniswap-v3-ethereum`, схема —
-`DEX AMM (Extended)`. Мы читали стандарт с первого живого запроса и не знали этого.
-
-`npm run leverage` посылает **тот же самый** запрос на несколько деплоев этой схемы. Опора
-не на наше слово: аттестации двух независимых индексаторов вернули **одинаковый
-`requestCID`** при разных `responseCID` и `subgraphDeploymentID` — то есть байты запроса
-совпали, и говорят это они, а не мы. Замер целиком: `LEVERAGE-EVIDENCE.md`.
-
-⚠️ Вычислить `requestCID` из запроса мы по-прежнему не умеем и не притворяемся: равенство
-между деплоями — сравнение, а не восстановление прообраза.
-
-## Деньги
-
-Каждый платный запрос — **$0.01 USDC на Base**. Рукопожатие x402 не самописное: его
-делают официальные `@x402/fetch` и `@x402/evm`, те же, что использует
-`@graphprotocol/client-x402`. Формат заголовка оплаты нигде не задокументирован так,
-чтобы его можно было проверить, — угадывать его значило бы завести ещё один ритуал.
-
-**Ключ плательщика берётся только из `X402_PRIVATE_KEY`.** Код его нигде не читает из
-волта и никуда не пишет. Без переменной `paidQuery` **отказывает**, а не отправляет
-неоплаченный запрос, который упал бы с непонятной причиной.
-
-`npm run quote` спрашивает цену **бесплатно**: чтение 402 ничего не стоит. Это же
-дешёвая проба живости эндпоинта.
-
-🔴 **Неудача платного запроса сообщает `spendUnknown: true`, а не «не потратили».** Бросок
-на этом шаге может означать и что платёж не ушёл, и что он ушёл, а ответ потерялся.
-Записать это как «трат не было» значило бы угадать — а угадывать про деньги нельзя.
-⚠️ Но 402 **не доказывает существование субграфа**: выдуманный идентификатор даёт тот же
-вызов, потому что шлюз просит оплату до разрешения id. Замерено.
+    npm ci && npm test          # the run prints the number of tests, not this file
+    npm run quote               # ask the gateway its price FOR FREE (reading a 402 costs nothing)
+    npm run drift               # watchdog on The Graph's addresses, needs the network
+    npm run drift:world         # watchdog on the AgentBook address, needs the network
+    npm run leverage            # one query, several deployments of the standardized schema
+    npm run test:offline        # no network: live tests skip BY NAME, not silently
 
 ---
 
-## World AgentKit — резолв агента в человека
+## Two steps, and the second does NOT follow from the first
 
-`src/world.js`. Спрашивает у AgentBook (World Chain, chainId 480,
-`0xA23aB2712eA7BBa896930544C7d6636a96b944dA`), стоит ли за адресом агента
-World-ID-проверенный человек, и проверяет его SIWE-подпись.
+**1. The signature** (`src/attestation.js`) — `responseCID` is computed over the **exact
+bytes as they arrived**, then the EIP-712 digest is assembled and the signer's address
+recovered.
 
-**Где это выполняется и почему это не деталь.** Всё здесь требует сети, поэтому **ничего
-из этого не может происходить внутри энклава**: резолв — чтение из World Chain, а проверка
-подписи — тоже потенциальное чтение, потому что кошельки World App смарт-контрактные и
-идут через **ERC-1271**, а ecrecover остаётся лишь откатом для EOA.
+**2. Usability** (`src/usability.js`) — separately.
+Sample 2 in the fixtures is a **correctly attested answer with a GraphQL error and no
+data**, billed like any other. "The signature verified" ≠ "a price was obtained".
+The predicates: no `errors` (their presence is a **refusal**, not a warning) · `data` is
+non-empty · `hasIndexingErrors == false` · source freshness against the chain head · a price
+is found and is **not `"0"`** (zero is legitimate for long-tail tokens and useless as a
+reference) · and **separately**, the freshness of the price itself.
 
-Поэтому клейм ограничен так: **«перед тем как запросить подпись, мы спрашиваем реестр
-AgentBook, стоит ли за адресом зарегистрированный человек, и различаем три ответа»**.
-Не «Signer подписывает только за агентов с человеком»: это поместило бы проверку внутрь
-аттестованной границы, где её нет.
+⚠️ **The data carries two different ages.** A fresh subgraph head does not excuse a
+year-old price: prices are written inside event handlers, and on a dead market those never
+fire while indexing stays green. Both ages are bounded independently.
 
-🔴 **И ни одного нашего агента в реестре НЕТ.** Регистрация нам недоступна с обеих сторон:
-World ID не получить (Orb недостижим, Document-уровень для Украины не поддерживается), а
-тестовую сеть опубликованный `agentkit-cli@0.2.0` не адресует — флага `--network` в нём нет,
-сеть зашита константой, хотя документация его описывает. Поэтому **писать про
-зарегистрированного агента в настоящем времени нельзя**: работает читающая половина, и
-ровно так это и надо называть.
+## What this code does NOT claim
 
-### Три исхода вместо двух, и это не педантизм
+`src/chain.js` resolves the signer's address to a staked indexer — with an **on-chain
+query**. An enclave cannot do that: it has no network. Therefore
 
-Официальный клиент (`worldcoin/agentkit`, `core/src/agent-book.ts`) возвращает `null` и
-при `humanId === 0n`, и внутри `catch {}`. Различить «человека нет» и «RPC лежит»
-невозможно, а последствие несимметрично: при сбое **откажут законному человеку**, и
-искать пойдут незарегистрированного агента, а не сломанный узел.
+- **the attestation is not the enclave's trust anchor**; it goes into the snapshot as an
+  **artifact for independent re-checking**;
+- the anchor remains **our** signature, and we answer for having checked the chain.
 
-| исход | значение |
+🔴 **`requestCID` is deliberately not verified.** Its preimage is unknown to us: four
+plausible encodings of a known query failed to reproduce the value in the sample. Claiming a
+check you cannot perform is a ritual, not a guarantee.
+
+🔴 **The Graph's addresses moved with Horizon.** The pre-Horizon `DisputeManager` is now
+`LegacyDisputeManager`, and with it a **different address is recovered — silently, with no
+error** (a test pins this). Anything baked needs a watchdog whose alarm is
+**distinguishable from a policy refusal**.
+
+## State
+
+| part | status |
 |---|---|
-| `ok:true, registered:true` | живой контракт назвал `humanId` |
-| `ok:true, registered:false` | живой контракт ответил «никого» |
-| `ok:false, lookup_failed` | **выяснить не удалось** — никогда не читается как «нет» |
-| `ok:false, no_contract_at_address` | по адресу нет кода: миграция названа, а не принята за ответ |
+| attestation verification | ✅ works, tested against live samples |
+| usability check | ✅ works |
+| on-chain indexer resolution | ✅ verified with a live query |
+| x402 client | ✅ built on `@x402/fetch`; the free `quote` verified live |
+| paid query | ✅ live paid reads made; every one is spending, and spending is Alex's call |
+| snapshot signing | ⏳ needs the data-signing key — an operator step in the signer lane |
+| The Graph address watchdog | ✅ `npm run drift`, checked against the live address book |
+| agent → human resolution (World) | ✅ `src/world.js`, live AgentBook read passes |
+| AgentBook address watchdog | ✅ `npm run drift:world`, on-chain plus the official client's constant |
+| Permit2 vectors | ✅ all four reproduced, domain checked against the deployed contract |
 
-То же разделение у подписи: сетевой сбой это `verification_failed`, а не `valid:false`.
+⚠️ No test counts are written in this file. They go stale the moment a case is added, and
+this repository has already had a count drift while every gate stayed green. The run prints
+the number.
 
-### Защита от повтора включена принудительно
+## The tests are falsified, not merely green
 
-В ките она опциональна: `if (options.checkNonce)` в `core/src/validate.ts`. Не передал
-колбэк — и подписанное сообщение реиграется внутри пятиминутного окна, хотя сам кит
-называет эту ветку «possible replay attack». Здесь отсутствие счётчика — отказ
-`nonce_check_required`, как `policy_required`. Сбой хранилища — отдельный
-`nonce_check_failed`, не обвинение в повторе.
+Every planted defect must go red **in the test that asserts it**. Checked: a broken
+`normaliseV`, `errors` treated as a warning, the price-age check removed — each produces
+exactly one red.
 
-### Запечённый адрес под сторожем
+🔴 **The first pass caught a false green of my own:** the test "raw v is normalised" passed
+with the normalisation broken, because `viem` understands `v: 0` by itself. The test
+asserted something other than what it checked. It is now split into a unit test of the
+function and an end-to-end one, and the comment that oversold it has been rewritten.
 
-`npm run drift:world` сверяет адрес **двумя независимыми способами**: есть ли по нему код
-в цепи и называет ли его тем же официальный клиент. Ончейн сильнее — исходник кита может
-отстать от миграции, байткод не может. Исходы `0` / `1` / `2`, где `2` — «проверить не
-удалось» и это не `0`.
+## The watchdog on baked addresses
 
-🔴 **Сторож появился не из принципа, а из долга.** Наш роадмап с 28.08 нёс адрес
-`0xE1D1D3526A6FAa37eb36bD10B933C1b77f4561a4`, по которому **нет контракта вообще**.
-Пять дней никто не заметил, **потому что этот путь никто не выполнял** — ровно тот же
-класс, что `wrapFetchWithPayment` с viem-аккаунтом вместо клиента. Подсадка старого
-адреса роняет живой тест, что и доказывает: тест сверяется с миром, а не с собой.
+`npm run drift` compares the baked Graph addresses against their live address book.
+**Three outcomes, and they do not collapse into two:** `0` — no drift, `1` — drift found,
+`2` — **could not check**. The last one deliberately does not mean "no drift".
+
+That is the rule a review caught unwritten: anything baked must have a watchdog whose alarm
+is **distinguishable from a policy refusal**. Otherwise a protocol migration reads as "the
+signature did not verify".
+
+⚠️ The watchdog caught a trap on itself: `packages/address-book/src/subgraph-service/addresses.json`
+is a **symlink** in git, and the raw endpoint returns the target path instead of JSON. It
+honestly said "could not check" rather than "no drift". The URL now points at the real file.
+
+## Permit2 vectors (Uniswap)
+
+`src/permit2.js` makes the Permit2 EIP-712 spec **runnable**. The `vectors/` directory in
+the submission repository was **empty** while the spec was cited as "partially validated" —
+a vector you cannot run confirms nothing.
+
+All four references are reproduced from first principles, and the **domain is checked
+against the deployed contract** (`DOMAIN_SEPARATOR()`, a free `eth_call`), not only against
+our own arithmetic.
+
+⚠️ **The Permit2 domain has THREE fields, no `version`.** The familiar four-field one
+produces a signature the contract rejects as `InvalidSigner` — that is, it complains about
+the **key**, not the domain. A negative control for this is its own test.
+
+⚠️ **The type label does not protect you.** `uint160` and `uint256` encode into the same
+32-byte word, so swapping the label is **invisible**. Only packing into 20 bytes is
+dangerous, and that has its own test, verified by the fact that it **fails** at the correct
+width.
+
+⚠️ **An incomplete policy is its own outcome, not a refusal.** No allow-list or no ceiling
+⇒ `policy_required`, matching the enclave's `POLICY_REQUIRED`. Collapsing that into "not
+allowed" means reading "the rules said no" where the truth is "there are no rules yet" —
+and nobody goes and fixes that.
+
+🔴 **This is digest assembly, not signing.** There is no Permit2 signing inside the enclave:
+it needs an action of its own that does not exist yet. Writing "Signer signs Permit2" before
+that would be a lie in a public submission.
+
+## The subgraph we read is a Messari Standardized Subgraph
+
+Found out on 7 September, and not because we went looking: the id in `src/fetch.js` is
+byte for byte the one Messari's deployment registry lists for `uniswap-v3-ethereum`, on the
+`DEX AMM (Extended)` schema. We had been reading the standard since the first live query and
+did not know it.
+
+`npm run leverage` sends the **identical** query to several deployments of that schema. The
+evidence is not our word: attestations from two independent indexers came back with the
+**same `requestCID`** while `responseCID` and `subgraphDeploymentID` differ — the request
+bytes matched, and they are the ones saying so. The whole measurement: `LEVERAGE-EVIDENCE.md`.
+
+⚠️ We still cannot compute `requestCID` from the query and do not pretend to: equality
+across deployments is a comparison, not a reconstruction of the preimage.
+
+## Money
+
+Every paid query is **$0.01 USDC on Base**. The x402 handshake is not hand-rolled: the
+official `@x402/fetch` and `@x402/evm` do it, the same ones `@graphprotocol/client-x402`
+uses. The payment header format is not documented anywhere in a way that could be checked,
+and guessing it would be one more ritual.
+
+**The payer key is taken only from `X402_PRIVATE_KEY`.** This code never reads it from a
+vault and never writes it anywhere. Without the variable, `paidQuery` **refuses** rather
+than sending an unpaid request that would fail for an unclear reason.
+
+`npm run quote` asks the price **for free**: reading a 402 costs nothing. It doubles as a
+cheap liveness probe for the endpoint.
+
+🔴 **A failed paid query reports `spendUnknown: true`, not "we did not spend".** A throw at
+that step can mean the payment never went out, or that it did and the answer was lost.
+Recording it as "no spend" would be a guess, and you do not guess about money.
+
+⚠️ But a 402 **does not prove a subgraph exists**: a fabricated id produces the same
+challenge, because the gateway asks for payment before resolving the id. Measured.
+
+---
+
+## World AgentKit — resolving an agent to a human
+
+`src/world.js`. Asks AgentBook (World Chain, chainId 480,
+`0xA23aB2712eA7BBa896930544C7d6636a96b944dA`) whether a World-ID-verified human stands
+behind an agent's address, and verifies that human's SIWE signature.
+
+**Where this runs, and why that is not a detail.** Everything here needs the network, so
+**none of it can happen inside an enclave**: the resolution is a read from World Chain, and
+verifying the signature is potentially a read too, because World App wallets are smart
+contracts and go through **ERC-1271**, with ecrecover only as a fallback for EOAs.
+
+So the claim is bounded like this: **"before requesting a signature, we ask the AgentBook
+registry whether a registered human stands behind the address, and we distinguish three
+answers."** Not "Signer only signs for agents with a human" — that would place the check
+inside the attested boundary, where it is not.
+
+🔴 **And none of our agents is in the registry.** Registration is closed to us from both
+sides: World ID is unobtainable (no Orb within reach, and Document level is not supported
+for Ukraine), and the published `agentkit-cli@0.2.0` does not address a test network — it
+has no `--network` flag, the network is a hard-coded constant, though the documentation
+describes one. So **nothing may be written in the present tense about a registered agent**:
+the reading half works, and that is exactly what it should be called.
+
+### Three outcomes instead of two, and that is not pedantry
+
+The official client (`worldcoin/agentkit`, `core/src/agent-book.ts`) returns `null` both for
+`humanId === 0n` and inside a `catch {}`. Telling "there is no human" apart from "the RPC is
+down" is impossible, and the consequence is asymmetric: on a failure a **legitimate human is
+refused**, and someone goes looking for an unregistered agent instead of a broken node.
+
+| outcome | meaning |
+|---|---|
+| `ok:true, registered:true` | a live contract named a `humanId` |
+| `ok:true, registered:false` | a live contract answered "nobody" |
+| `ok:false, lookup_failed` | **could not establish** — never read as "no" |
+| `ok:false, no_contract_at_address` | no code at the address: a migration named, not mistaken for an answer |
+
+The same split applies to the signature: a network failure is `verification_failed`, not
+`valid:false`.
+
+### Replay protection is on by force
+
+In the kit it is optional: `if (options.checkNonce)` in `core/src/validate.ts`. Pass no
+callback and a signed message replays inside a five-minute window — while the kit itself
+calls that branch a "possible replay attack". Here the absence of a nonce store is a refusal,
+`nonce_check_required`, in the same spirit as `policy_required`. A store failure is a
+separate `nonce_check_failed`, not an accusation of replay.
+
+### The baked address has a watchdog
+
+`npm run drift:world` checks the address **two independent ways**: whether there is code at
+it on chain, and whether the official client names the same one. The on-chain answer is the
+stronger of the two — the kit's source can lag a migration, bytecode cannot. Outcomes
+`0` / `1` / `2`, where `2` is "could not check" and is not `0`.
+
+🔴 **The watchdog exists out of debt, not principle.** Our roadmap carried the address
+`0xE1D1D3526A6FAa37eb36bD10B933C1b77f4561a4` from 28 August, at which there is **no contract
+at all**. Nobody noticed for five days, **because nobody executed that path** — the same
+class as `wrapFetchWithPayment` given a viem account instead of a client. Planting the old
+address reddens the live test, which is what proves the test checks the world rather than
+itself.
+
+---
+
+## A note on language
+
+This file, the code and its output are in English. The **specifications** in `specs/` are
+in Russian: they are internal working documents, published as they were written rather than
+tidied up for an audience. Translating them after the fact would make them read as
+documents prepared for judging, which is not what they are. The same reasoning applies to
+the prompts in `plans/prompts/` — they are the text that was actually given to the model.

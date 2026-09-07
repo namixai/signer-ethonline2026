@@ -141,34 +141,49 @@ print(d.get("pcr0_sha384") or "")
   note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
   note ""
 
-  # We deliberately do NOT print `registered_onchain` from the response. That field is read
-  # from an environment variable on the gateway, so it reports what the operator configured
-  # — it is our word about ourselves. The question "is this measurement registered" has an
-  # answer that owes us nothing, and this is it.
-  note "Is that measurement registered on chain? Ask the registry, not us:"
+  # 🔴 SAY ONLY WHAT THIS FRAME DOES. It sends a fresh nonce and prints what came back.
+  # It does NOT open the COSE document, so it cannot show you the nonce inside it — and
+  # "bound to your nonce" is exactly the sentence a viewer would take as demonstrated.
+  # The binding is real and it is the viewer's to check; the frame says where, not that.
+  note "The service took the nonce you just generated. Whether that nonce is inside the"
+  note "signed document is the thing to check, and this frame does not check it — it does"
+  note "not open the COSE. Parsing it and verifying the AWS certificate chain is the"
+  note "procedure in VERIFY-SIGNER-YOURSELF.md. We would rather point at it than imply it."
+  note ""
+
+  # 🔴 THE REGISTRY IS NOT THE LEAD, AND NOT BECAUSE THE ANSWER IS INCONVENIENT.
+  #
+  # It answers `false` for this measurement, and that is correct: the registry keeps ONE
+  # active measurement PER OWNER, and our owner's slot holds the PRODUCTION enclave. This
+  # is the demo one. Registering it would DEPRECATE production in the same transaction,
+  # which is not a thing to do for a nicer demo.
+  #
+  # So the frame leads with the attestation, which anyone can obtain right now, and names
+  # the registry's answer instead of performing it. The command is printed in full and the
+  # flag below runs it, because a check we describe but hide is worse than one we skip.
+  note "About the registry on Base: it holds ONE active measurement per owner, and our"
+  note "owner's slot holds PRODUCTION. This is the demo enclave, so the registry will say"
+  note "false for this hash — correctly. Registering the demo would deprecate production."
+  note ""
+  note "The check that owes us nothing and does not involve the registry at all: rebuild"
+  note "the image from the public clone and compare the measurement. That procedure is"
+  note "VERIFY-SIGNER-YOURSELF.md in namixai/signer. It takes longer than this frame, which"
+  note "is why it is written down rather than performed here."
+  note ""
+  note "Ask the registry yourself if you want to — the command, in full:"
   printf '   cast call %s "isPCR0Active(bytes)(bool,address)" 0x%s --rpc-url %s\n' \
     "$PCR0_REGISTRY" "$pcr0" "$BASE_RPC"
-  if command -v cast >/dev/null 2>&1 && [ -n "$pcr0" ]; then
-    cast call "$PCR0_REGISTRY" "isPCR0Active(bytes)(bool,address)" "0x${pcr0}" --rpc-url "$BASE_RPC" \
-      2>/dev/null | sed 's/^/   /' \
-      || note "(registry call failed — that is a could-not-check, not a false)"
+  if [ "${DEMO_ASK_REGISTRY:-0}" = "1" ]; then
+    if command -v cast >/dev/null 2>&1 && [ -n "$pcr0" ]; then
+      cast call "$PCR0_REGISTRY" "isPCR0Active(bytes)(bool,address)" "0x${pcr0}" --rpc-url "$BASE_RPC" \
+        2>/dev/null | sed 's/^/   /' \
+        || note "(registry call failed — that is a could-not-check, not a false)"
+    else
+      note "(foundry not installed; the command above is the whole check)"
+    fi
   else
-    note "(install foundry to run it here; the command above is the whole check)"
+    note "   (not run here — set DEMO_ASK_REGISTRY=1 to run it; expect false, for the reason above)"
   fi
-  note "Both lines matter: false, or a different owner, means stop."
-  note ""
-  note "⚠️ Read that answer with one fact in hand: the registry keeps ONE active"
-  note "measurement PER OWNER, so registering a second enclave under the same owner"
-  note "deprecates the first in the same transaction. If this returns false while the"
-  note "service is healthy, the likely reason is that another of our lanes currently"
-  note "holds the registration — not that the code is unverified. The rebuild check in"
-  note "VERIFY-SIGNER-YOURSELF.md does not depend on the registry at all, and that is"
-  note "the one we would rather be judged on."
-  note ""
-  note "What a viewer does next, and what it costs them: rebuild the image from the"
-  note "public clone and compare PCR0. That procedure is VERIFY-SIGNER-YOURSELF.md in"
-  note "namixai/signer. We do not ask anyone to take the hash on faith — the point of"
-  note "the frame is that they do not have to."
   rm -f /tmp/.demo_hdr
 }
 
