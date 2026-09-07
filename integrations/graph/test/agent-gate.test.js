@@ -112,6 +112,11 @@ test('LIVE: our own demo agent is refused today, and for the right reason', asyn
   // The negative path needs no registration to demonstrate, which is the point: we can
   // show the gate working today, and the answer is a real one from both registries.
   const g = await gateSignatureRequest({ agentAddress: AGENT, observedAtMs: Date.now() });
+  if (g.reason === 'human_unverified') {
+    // Недоступный чужой RPC — это про сеть, а не про гейт. Красный здесь описывал бы
+    // не то, что тест утверждает, и приучал бы игнорировать красное.
+    return t.skip(`реестр не ответил: ${JSON.stringify(g.receipt.detail)}`);
+  }
   assert.equal(g.allowed, false);
   assert.equal(g.reason, 'no_registered_human', `получено: ${g.reason} / ${JSON.stringify(g.receipt.detail)}`);
 });

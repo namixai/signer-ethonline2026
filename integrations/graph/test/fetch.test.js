@@ -30,7 +30,7 @@ test('a missing or malformed challenge is a named refusal, not a throw', () => {
 });
 
 test('paidQuery refuses without a payer key instead of sending an unpaid request', async () => {
-  const r = await paidQuery({ privateKey: undefined, fetchImpl: () => assert.fail('must not call fetch') });
+  const r = await paidQuery({ privateKey: null, fetchImpl: () => assert.fail('must not call fetch') });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_payer_key');
 });

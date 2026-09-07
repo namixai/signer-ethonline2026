@@ -8,7 +8,7 @@
 //     decision: the attestation is an artefact for third-party re-checking, never a
 //     trust anchor inside the enclave.
 
-import { keccak256, encodeAbiParameters, toBytes, recoverAddress } from 'viem';
+import { keccak256, encodeAbiParameters, stringToBytes, toBytes, recoverAddress } from 'viem';
 
 // EIP-712 constants, read from graphprotocol/contracts DisputeManager.sol.
 const DOMAIN_TYPE_HASH = keccak256(
@@ -127,7 +127,14 @@ export async function verifyAttestation(rawBody, attestation, network = GRAPH_NE
       detail: { got: rawBody === null ? 'null' : typeof rawBody },
     };
   }
-  const computed = keccak256(toBytes(rawBody));
+  // 🔴 stringToBytes, НЕ toBytes. `toBytes` угадывает по виду значения: строку, похожую на
+  // hex, оно ДЕКОДИРУЕТ вместо того чтобы хешировать её текст, а Uint8Array прогоняет через
+  // приведение к строке. Замерено на viem 2.56.3: toBytes('0xdeadbeef') даёт 4 байта вместо
+  // 10, а toBytes(Uint8Array[1,2,3]) — 5 вместо 3.
+  //
+  // responseCID считается по ТОЧНЫМ байтам ответа, и догадка о типе — последнее, что здесь
+  // нужно. Тело обязано быть строкой (проверено выше) и кодируется как текст, явно.
+  const computed = keccak256(stringToBytes(rawBody));
   if (computed !== attestation.responseCID) {
     return {
       ok: false,
@@ -166,7 +173,10 @@ export function parseAttestationHeader(headerValue) {
     throw new Error(`attestation header must be a JSON object, got ${a === null ? 'null' : typeof a}`);
   }
   for (const field of ['requestCID', 'responseCID', 'subgraphDeploymentID', 'r', 's', 'v']) {
-    if (a[field] === undefined) throw new Error(`attestation missing field: ${field}`);
+    // `== null`, не `=== undefined`: {"v": null} проходил, и дальше normaliseV бросал
+    // сообщение о типе из нижнего кадра, а null в r/s доезжал до viem. Тот же капкан
+    // записан в fetch.js — null !== undefined, и проверка на одно пропускает другое.
+    if (a[field] == null) throw new Error(`attestation missing field: ${field}`);
   }
   return a;
 }

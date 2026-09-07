@@ -96,7 +96,24 @@ export function buildSnapshot({
   // agreed with the code instead of with checkUsable. Hence the check here AND a test
   // that builds its input from the real checkUsable output.
   for (const [k, v] of [['metaBlock', usability.metaBlock], ['priceBlock', usability.priceBlock], ['chainHead', chainHead]]) {
-    if (v === undefined || v === null || v === '') return refuse('missing_block_number', k);
+    if (v == null || v === '') return refuse('missing_block_number', k);
+  }
+
+  // 🔴 AND EVERY OTHER FIELD THAT ENTERS THE SIGNATURE, because JSON.stringify DROPS a key
+  // whose value is undefined. Not empty — GONE. A caller who misspells a field (and callers
+  // hand-write these objects) produces signed bytes with the authority statement simply
+  // absent, and nothing anywhere says so.
+  //
+  // Same defect as `source_block` two commits ago, one field over: I fixed the instance and
+  // not the class, so it came back. Measured — with `indexerAddress` instead of `indexer`,
+  // `source.indexer` was missing from dataText entirely, as was `checked.response_bytes_hash`.
+  for (const [k, v] of [
+    ['indexer', indexer.indexer],
+    ['allocationId', verification.allocationId],
+    ['subgraphDeploymentID', verification.subgraphDeploymentID],
+    ['responseCID', verification.responseCID],
+  ]) {
+    if (typeof v !== 'string' || v === '') return refuse('missing_authority_field', k);
   }
 
   // 🔴 A READING CANNOT BE OBSERVED BEFORE THE BLOCK IT REPORTS. This is not a tolerance

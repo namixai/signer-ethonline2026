@@ -5,6 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCollector } from '../scripts/record-cast.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const feed = (chunks) => {
   const out = [];
@@ -50,4 +53,28 @@ test('empty writes produce no events', () => {
   c.write(Buffer.alloc(0));
   c.end();
   assert.equal(out.length, 0);
+});
+
+test('🔴 the committed cast still describes the CURRENT walkthrough', () => {
+  // The checked-in recording had drifted to the old seven-step WETH walkthrough while the
+  // code had moved to eight steps with ONDO, the snapshot and the gate. A judge pressing
+  // play saw something the code no longer does, and nothing said so.
+  //
+  // This does not re-run the demo (that costs three minutes); it asserts the markers that
+  // must appear, so a walkthrough change without a re-record goes red here.
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'demo.cast'), 'utf8');
+  const lines = src.trim().split('\n');
+  const text = lines.slice(1).map((l) => JSON.parse(l)[2]).join('');
+
+  const frames = (text.match(/─{72}/g) || []).length / 2;
+  assert.equal(frames, 8, `в записи ${frames} кадров, в проходе 8 — перезапиши: npm run demo:cast`);
+
+  for (const marker of ['ONDO', 'снимок собран', 'НЕ ПОЛУЧАЕТ ПОДПИСЬ', 'Граница']) {
+    assert.ok(text.includes(marker), `запись не содержит «${marker}» — она отстала от кода`);
+  }
+  assert.ok(!text.includes('WETH'), 'запись всё ещё показывает прежний символ');
+  assert.ok(!text.includes('�'), 'в записи символы замены — разрез многобайтового символа');
+
+  const duration = JSON.parse(lines[lines.length - 1])[0];
+  assert.ok(duration > 120 && duration < 240, `длительность ${duration.toFixed(0)} с вне окна 2–4 мин`);
 });

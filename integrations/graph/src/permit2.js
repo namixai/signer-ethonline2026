@@ -101,35 +101,80 @@ export function checkPermitPolicy(permitSingle, policy) {
     }
   }
 
-  let amount;
-  try {
-    amount = BigInt(details.amount);
-  } catch {
-    return { ok: false, reason: 'bad_request', detail: 'amount is not an integer' };
-  }
+  // 🔴 EVERY conversion is wrapped, not just `amount`. The contract above says malformed
+  // input is a named refusal and never a throw, and only one field honoured it: a missing
+  // token threw InvalidAddressError, a missing spender the same, an undefined sigDeadline a
+  // TypeError, a non-integer expiration a SyntaxError, and a policy list that is not an
+  // array a TypeError. Five ways out of a function that promised none. Measured, all five.
+  //
+  // A caller expecting { ok:false, reason } gets an exception instead and the reason is
+  // lost — which is worse than a wrong reason, because there is nothing to log.
+  const addr = (v, what) => {
+    if (typeof v !== 'string') return null;
+    try {
+      return getAddress(v);
+    } catch {
+      return null;
+    }
+  };
+  const big = (v) => {
+    if (v === undefined || v === null || v === '' || typeof v === 'boolean') return null;
+    try {
+      return BigInt(v);
+    } catch {
+      return null;
+    }
+  };
+
+  const amount = big(details.amount);
+  if (amount === null) return { ok: false, reason: 'bad_request', detail: 'amount is not an integer' };
 
   // Refused regardless of the cap: an owner with a huge ceiling must not silently
   // lose this guarantee.
   if (amount === UINT160_MAX) {
     return { ok: false, reason: 'infinite_allowance_refused' };
   }
-  if (amount > BigInt(policy.maxAmount)) {
-    return { ok: false, reason: 'amount_over_cap' };
-  }
+  const maxAmount = big(policy.maxAmount);
+  if (maxAmount === null) return { ok: false, reason: 'policy_required', detail: 'maxAmount is not an integer' };
+  if (amount > maxAmount) return { ok: false, reason: 'amount_over_cap' };
 
-  const allowedTokens = policy.allowedTokens.map((a) => getAddress(a));
-  if (!allowedTokens.includes(getAddress(details.token))) {
-    return { ok: false, reason: 'token_not_allowed' };
+  const token = addr(details.token);
+  if (token === null) return { ok: false, reason: 'bad_request', detail: 'details.token is not an address' };
+  const spenderAddr = addr(spender);
+  if (spenderAddr === null) return { ok: false, reason: 'bad_request', detail: 'spender is not an address' };
+
+  // A policy list that is present but not a list is an incomplete configuration, not a
+  // denial — the same split as a missing list above.
+  if (!Array.isArray(policy.allowedTokens)) return { ok: false, reason: 'policy_required', detail: 'allowedTokens is not a list' };
+  if (!Array.isArray(policy.allowedSpenders)) return { ok: false, reason: 'policy_required', detail: 'allowedSpenders is not a list' };
+
+  const allowedTokens = [];
+  for (const a of policy.allowedTokens) {
+    const x = addr(a);
+    if (x === null) return { ok: false, reason: 'policy_required', detail: `allowedTokens contains a non-address: ${String(a)}` };
+    allowedTokens.push(x);
   }
-  const allowedSpenders = policy.allowedSpenders.map((a) => getAddress(a));
-  if (!allowedSpenders.includes(getAddress(spender))) {
-    return { ok: false, reason: 'spender_not_allowed' };
+  if (!allowedTokens.includes(token)) return { ok: false, reason: 'token_not_allowed' };
+
+  const allowedSpenders = [];
+  for (const a of policy.allowedSpenders) {
+    const x = addr(a);
+    if (x === null) return { ok: false, reason: 'policy_required', detail: `allowedSpenders contains a non-address: ${String(a)}` };
+    allowedSpenders.push(x);
   }
-  if (policy.maxExpiration !== undefined && BigInt(details.expiration) > BigInt(policy.maxExpiration)) {
-    return { ok: false, reason: 'expiration_over_cap' };
+  if (!allowedSpenders.includes(spenderAddr)) return { ok: false, reason: 'spender_not_allowed' };
+
+  if (policy.maxExpiration !== undefined) {
+    const exp = big(details.expiration), cap = big(policy.maxExpiration);
+    if (exp === null) return { ok: false, reason: 'bad_request', detail: 'expiration is not an integer' };
+    if (cap === null) return { ok: false, reason: 'policy_required', detail: 'maxExpiration is not an integer' };
+    if (exp > cap) return { ok: false, reason: 'expiration_over_cap' };
   }
-  if (policy.maxSigDeadline !== undefined && BigInt(sigDeadline) > BigInt(policy.maxSigDeadline)) {
-    return { ok: false, reason: 'sig_deadline_over_cap' };
+  if (policy.maxSigDeadline !== undefined) {
+    const dl = big(sigDeadline), cap = big(policy.maxSigDeadline);
+    if (dl === null) return { ok: false, reason: 'bad_request', detail: 'sigDeadline is not an integer' };
+    if (cap === null) return { ok: false, reason: 'policy_required', detail: 'maxSigDeadline is not an integer' };
+    if (dl > cap) return { ok: false, reason: 'sig_deadline_over_cap' };
   }
   return { ok: true };
 }

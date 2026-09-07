@@ -288,3 +288,34 @@ test('the byte count is bytes, not characters', () => {
   assert.equal(bytes, new TextEncoder().encode(dataText).length);
   assert.equal(new TextEncoder().encode('э'.repeat(10)).length, 20, 'кириллица — два байта на символ');
 });
+
+test('🔴 a misnamed authority field is REFUSED — JSON.stringify would drop the key entirely', () => {
+  // Not "empty" — GONE. Measured: with `indexerAddress` instead of `indexer`, the signed
+  // dataText had no `source.indexer` key at all, and no `checked.response_bytes_hash`.
+  // Callers hand-write these objects, so a typo produced a signed snapshot whose authority
+  // statement simply was not there.
+  //
+  // This is `source_block` again, one field over: the instance was fixed, the class was not.
+  const cases = [
+    ['indexer', { ...good(), indexer: { ok: true, indexerAddress: '0xi' } }],
+    ['allocationId', { ...good(), verification: { ...good().verification, allocationId: undefined } }],
+    ['subgraphDeploymentID', { ...good(), verification: { ...good().verification, subgraphDeploymentID: '' } }],
+    ['responseCID', { ...good(), verification: { ...good().verification, responseCID: undefined } }],
+  ];
+  for (const [field, args] of cases) {
+    const r = buildSnapshot(args);
+    assert.equal(r.ok, false, field);
+    assert.equal(r.refusal.reason, 'missing_authority_field', field);
+    assert.equal(r.refusal.detail, field);
+  }
+});
+
+test('every key the signature covers is actually present in dataText', () => {
+  const { dataText } = buildSnapshot(good());
+  const o = JSON.parse(dataText);
+  for (const [obj, keys] of [[o.source, ['indexer', 'allocation_id', 'subgraph_deployment_id']],
+                             [o.checked, ['response_bytes_hash']],
+                             [o.reading, ['source_block', 'price_block', 'chain_head']]]) {
+    for (const k of keys) assert.ok(k in obj, `ключ ${k} отсутствует в подписываемых байтах`);
+  }
+});

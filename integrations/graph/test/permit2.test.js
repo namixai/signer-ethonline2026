@@ -171,3 +171,42 @@ test('malformed input is a named refusal, not a throw', () => {
     'bad_request',
   );
 });
+
+// ---- the named-refusal contract, enforced on EVERY field rather than one ----
+
+test('🔴 no malformed field escapes as an exception — the contract said so, one field kept it', () => {
+  // Measured before the fix: a missing token threw InvalidAddressError, a missing spender
+  // the same, an undefined sigDeadline a TypeError, a non-integer expiration a SyntaxError,
+  // and a non-array policy list a TypeError. Five ways out of a function that promised none.
+  // A caller expecting { ok:false, reason } got an exception and the reason was lost.
+  const P = {
+    allowedTokens: ['0x1111111111111111111111111111111111111111'],
+    allowedSpenders: ['0x2222222222222222222222222222222222222222'],
+    maxAmount: 1000n, maxExpiration: 9999999999n, maxSigDeadline: 9999999999n,
+  };
+  const O = {
+    details: { token: '0x1111111111111111111111111111111111111111', amount: 1n, expiration: 1n, nonce: 0n },
+    spender: '0x2222222222222222222222222222222222222222', sigDeadline: 1n,
+  };
+  const bad = [
+    ['token missing', { ...O, details: { ...O.details, token: undefined } }, P],
+    ['token malformed', { ...O, details: { ...O.details, token: 'not-an-address' } }, P],
+    ['spender missing', { ...O, spender: undefined }, P],
+    ['sigDeadline undefined', { ...O, sigDeadline: undefined }, P],
+    ['expiration non-numeric', { ...O, details: { ...O.details, expiration: 'abc' } }, P],
+    ['amount undefined', { ...O, details: { ...O.details, amount: undefined } }, P],
+    ['allowedTokens not a list', O, { ...P, allowedTokens: 'nope' }],
+    ['allowedSpenders not a list', O, { ...P, allowedSpenders: 42 }],
+    ['allowedTokens holds junk', O, { ...P, allowedTokens: ['x'] }],
+    ['maxAmount not numeric', O, { ...P, maxAmount: 'lots' }],
+    ['maxExpiration not numeric', O, { ...P, maxExpiration: {} }],
+  ];
+  for (const [name, order, policy] of bad) {
+    let r;
+    assert.doesNotThrow(() => { r = checkPermitPolicy(order, policy); }, `${name} бросил вместо отказа`);
+    assert.equal(r.ok, false, name);
+    assert.ok(typeof r.reason === 'string' && r.reason !== '', `${name}: причина потеряна`);
+  }
+  // and the honest order still passes
+  assert.deepEqual(checkPermitPolicy(O, P), { ok: true });
+});

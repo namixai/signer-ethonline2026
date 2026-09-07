@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -30,7 +30,9 @@ function findSuites(dir) {
 test('🔴 every suite lives where the glob can reach it', () => {
   const nested = findSuites(here)
     .map((p) => relative(here, p))
-    .filter((p) => p.includes('/'));
+    // `sep`, а не '/': relative() возвращает '\\' на Windows, и обе проверки тогда
+    // классифицируют вложенные наборы неверно — сторож проходит, а шаблон их не берёт.
+    .filter((p) => p.includes(sep));
 
   assert.deepEqual(
     nested,
@@ -43,6 +45,6 @@ test('🔴 every suite lives where the glob can reach it', () => {
 test('the glob actually matched more than one file', () => {
   // A shell that failed to expand would pass a literal `test/*.test.js`, Node would find
   // nothing, and an empty run reports success. Cheap insurance against a zero-suite green.
-  const top = findSuites(here).filter((p) => !relative(here, p).includes('/'));
+  const top = findSuites(here).filter((p) => !relative(here, p).includes(sep));
   assert.ok(top.length >= 5, `наборов наверху: ${top.length}`);
 });

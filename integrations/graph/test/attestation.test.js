@@ -222,3 +222,35 @@ test('a price block ahead of the chain head is refused, not treated as fresh', (
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'price_block_ahead_of_chain');
 });
+
+test('🔴 the body is hashed as TEXT, not guessed at — toBytes decodes hex-looking strings', async () => {
+  // Measured on viem 2.56.3: toBytes('0xdeadbeef') returns 4 bytes (hex-decoded) where the
+  // UTF-8 text is 10, and toBytes(new Uint8Array([1,2,3])) returns 5 rather than 3.
+  // responseCID is computed over the EXACT response bytes, and a helper that guesses the
+  // type by shape is the last thing that belongs there.
+  const { stringToBytes, toBytes, keccak256 } = await import('viem');
+  const hexish = '0xdeadbeef';
+  assert.notEqual(toBytes(hexish).length, stringToBytes(hexish).length,
+    'если бы совпадали, ловушки бы не было и этот тест был бы бессмысленным');
+  assert.equal(stringToBytes(hexish).length, 10, 'текст, а не декодированный hex');
+
+  // And the real path: a body that happens to start with 0x must still hash as its text.
+  const body = '0x1234';
+  const viaText = keccak256(stringToBytes(body));
+  const r = await verifyAttestation(body, { ...att('sample1.attestation.json'), responseCID: viaText });
+  assert.notEqual(r.reason, 'response_cid_mismatch', 'тело-строка обязано хешироваться как текст');
+});
+
+test('🔴 a null field in the attestation header is refused, not passed down', () => {
+  // `=== undefined` let {"v": null} through: normaliseV then threw a type message from a
+  // lower frame, and a null r/s reached viem. Same trap the x402 client already records —
+  // null !== undefined, and a check for one lets the other past.
+  const base = JSON.parse(raw('sample1.attestation.json'));
+  for (const field of ['requestCID', 'responseCID', 'subgraphDeploymentID', 'r', 's', 'v']) {
+    assert.throws(
+      () => parseAttestationHeader(JSON.stringify({ ...base, [field]: null })),
+      new RegExp(`missing field: ${field}`),
+      `null в ${field} должен отвергаться по имени`,
+    );
+  }
+});

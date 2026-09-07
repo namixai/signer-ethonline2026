@@ -97,6 +97,8 @@ export async function quote(subgraphId = UNISWAP_V3_ETHEREUM, query = PRICE_QUER
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query }),
+      // Без срока бесплатная предпроверка блокирует весь проход демо на молчащем узле.
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
     // No network is a named outcome, not a crash — and NOT the same as "the gateway

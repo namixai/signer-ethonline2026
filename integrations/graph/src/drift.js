@@ -30,7 +30,10 @@ export const ADDRESS_BOOK_URL =
  */
 export async function checkAddressDrift(
   network = GRAPH_NETWORK,
-  fetchJson = async (url) => (await fetch(url)).json(),
+  // Крайний срок на исходящем. Узел, принявший соединение и молчащий, иначе оставляет
+  // сторожа висеть навсегда, и `node src/drift.js` не доходит даже до кода выхода 2.
+  // world-drift.js это уже делает; здесь было пропущено.
+  fetchJson = async (url) => (await fetch(url, { signal: AbortSignal.timeout(10_000) })).json(),
 ) {
   let book;
   try {
