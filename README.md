@@ -60,7 +60,7 @@ CONTINUITY.md  component-by-component: what predates the event, what is written 
 AI-USE.md      where AI was used, and how the prompts are published
 specs/         protocol specs read from source, each pinned to a commit
 vectors/       Permit2 test vectors, two independent paths + an on-chain anchor
-plans/         PLAN.md, and prompts/ — the prompts the AI actually ran on
+plans/         PLAN.md, and prompts/ — three prompts, all predate the window (see AI below)
 scripts/       scrub-check.sh, the hygiene gate that runs in CI
 integrations/  the code written in the window — see Code below
 demo/          demo.sh and the Hyperliquid storyboard: the demo as a script, not a video
@@ -140,13 +140,36 @@ a fabricated subgraph id returns the same price challenge. Measured, not assumed
 happen inside one. The claim is "checked before a signature was requested", never "enclave
 policy".
 
+## Demo
+
+Two different things share the word "demo" here, and they are not the same demo.
+
+`npm run demo` above is the Graph walkthrough. This one is the Hyperliquid storyboard, and
+it lives in `demo/`:
+
+```bash
+cd demo && ./demo.sh --frame 3
+```
+
+It prints `false` from the attestation registry and says why that's the right answer, not
+a failure: production and demo are one owner with one active measurement at a time, and
+this frame reads the one that isn't currently live. The full sequence is in
+`demo/STORYBOARD-hyperliquid.md`.
+
 ## Specs
 
 | file | what it settles |
 |---|---|
 | `specs/SPEC-permit2-signature-transfer.md` | Both halves of Permit2 — AllowanceTransfer and SignatureTransfer — what the signature actually binds, and what it doesn't |
 | `specs/SPEC-uniswap-execution-path.md` | Where a Uniswap swap is signed and where it is only calldata; verified addresses on Ethereum and Base |
+| `specs/SPEC-uniswap-signature-surfaces.md` | What else gets a typed-data signature in the router path besides Permit2 — three commands that do, and one nested path that does even when the top-level call doesn't |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
+
+All four are in Russian. They are internal reading notes, published as they were written
+rather than translated for the occasion — the same choice `AI-USE.md` makes about the
+prompts, and for the same reason: a document tidied up after the fact describes the work
+instead of recording it. What each one settles is in the table above, in English; the
+reading itself isn't.
 
 ## Verify the product itself, not just this repo
 
@@ -159,8 +182,11 @@ of a reviewer's time.
 
 ## AI
 
-Claude Code wrote a large part of this repository. `AI-USE.md` says where, and the prompts
-are in `plans/prompts/` — the text that was actually executed, not a cleaned-up version.
+Claude Code wrote a large part of this repository. `AI-USE.md` says where. The three
+prompts in `plans/prompts/` are the text that was actually given to the model — and all
+three predate the event window (14, 15, 16 August). The work written during the window
+itself, `integrations/graph/` above, has no prompt file: we are not writing one after the
+fact to backfill it. `AI-USE.md` explains why the early material exists at all.
 
 ## Licence
 
