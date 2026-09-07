@@ -7,8 +7,14 @@ name: verify
 # published — git history outlives a revert.
 #
 # `vectors` recomputes every pinned Permit2 digest along two implementations that share
-# nothing, and then plants six deliberate defects to prove the check can go red. A
-# cross-check nobody has seen fail is not evidence.
+# nothing, and then plants deliberate defects to prove the check can go red. A cross-check
+# nobody has seen fail is not evidence.
+#
+# How many defects are planted is printed by each script and written down NOWHERE else,
+# including in the step names below. A count in a step name is a second source that cannot
+# be executed: on 2026-09-07 this file promised six and seven while the scripts planted
+# seven and eight. Both jobs were green throughout — a drifted count fails nothing, it just
+# quietly describes a set that no longer exists.
 #
 # Actions are pinned by commit SHA, not by tag. A tag is a moving pointer, and a workflow
 # that trusts one is trusting whoever can move it.
@@ -50,7 +56,7 @@ jobs:
         working-directory: vectors
         run: python3 verify_ours.py
 
-      - name: Permit2 — falsification, six planted defects, all must be caught
+      - name: Permit2 — falsification, every planted defect must be caught
         working-directory: vectors
         run: python3 falsify.py
 
@@ -58,7 +64,7 @@ jobs:
         working-directory: vectors
         run: python3 verify_nft_ours.py
 
-      - name: position NFTs — falsification, seven mutations
+      - name: position NFTs — falsification, every planted mutation must be caught
         working-directory: vectors
         run: python3 falsify_nft.py
 
