@@ -42,7 +42,21 @@ export function checkUsable(body, wantSymbol, chainHead, limit = STALENESS_LIMIT
   // Source freshness. This is the check the GMX trap would have defeated: there,
   // INDEXING showed 100% while the price had not moved in a year, because the
   // price is written inside event handlers and a dead market fires none.
-  const lag = BigInt(chainHead) - BigInt(meta.block.number);
+  // 🔴 ОБА ЧИСЛА ЧЕРЕЗ ПРОВЕРКУ, а не прямо в BigInt. Условие выше смотрело только
+  // истинность, поэтому "abc" или "25904639.0" доводили BigInt до SyntaxError, и он уходил
+  // из checkUsable мимо контракта — при том что для блока ЦЕНЫ это правило уже
+  // сформулировано ниже. Правило было и применялось к одному из двух. Замерено: бросали
+  // оба, и кривой chainHead тоже.
+  const asBlock = (v) => {
+    if (v === undefined || v === null || v === '' || typeof v === 'boolean') return null;
+    try { return BigInt(v); } catch { return null; }
+  };
+  const head = asBlock(chainHead);
+  if (head === null) return fail('bad_chain_head', { chainHead: String(chainHead) });
+  const metaBlockN = asBlock(meta.block.number);
+  if (metaBlockN === null) return fail('bad_meta_block', { number: String(meta.block.number) });
+
+  const lag = head - metaBlockN;
   if (lag < 0n) return fail('source_ahead_of_chain', { lag: lag.toString() });
   if (lag > limit) {
     return fail('source_stale', { lag: lag.toString(), limit: limit.toString() });
@@ -74,7 +88,7 @@ export function checkUsable(body, wantSymbol, chainHead, limit = STALENESS_LIMIT
 
   // The price carries its OWN age, separate from the subgraph's head. A snapshot
   // can be freshly signed over a year-old price; both ages must be bounded.
-  const priceLag = BigInt(chainHead) - priceBlock;
+  const priceLag = head - priceBlock;
   // A price block ahead of the chain head is not "very fresh" — it is nonsense, and
   // a negative lag would sail under any upper bound. Same guard as for the source.
   if (priceLag < 0n) {

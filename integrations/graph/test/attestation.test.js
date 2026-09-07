@@ -254,3 +254,21 @@ test('🔴 a null field in the attestation header is refused, not passed down', 
     );
   }
 });
+
+test('🔴 a malformed block number is a named refusal, not an escaped SyntaxError', () => {
+  // The rule was already written for the PRICE block and applied to one of the two.
+  // Measured before the fix: "abc" and "25904639.0" both threw SyntaxError out of
+  // checkUsable, and so did a malformed chainHead.
+  const body = (n) => ({ data: { tokens: [], _meta: { block: { number: n }, hasIndexingErrors: false } } });
+  for (const bad of ['abc', '25904639.0', {}, true, '']) {
+    let r;
+    assert.doesNotThrow(() => { r = checkUsable(body(bad), 'X', 100n); }, `meta.block.number=${String(bad)}`);
+    assert.equal(r.ok, false);
+    assert.ok(['bad_meta_block', 'missing_meta_block'].includes(r.reason), `получено: ${r.reason}`);
+  }
+  for (const bad of ['abc', {}, null]) {
+    let r;
+    assert.doesNotThrow(() => { r = checkUsable(body('1'), 'X', bad); }, `chainHead=${String(bad)}`);
+    assert.equal(r.reason, 'bad_chain_head');
+  }
+});
