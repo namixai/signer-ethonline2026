@@ -26,10 +26,20 @@ W, H, FPS = 1280, 720, 12
 FONT_PATH = "/System/Library/Fonts/Menlo.ttc"
 SYMBOL_FONT = "/System/Library/Fonts/Apple Symbols.ttf"
 BG, FG = (13, 17, 23), (201, 209, 217)
-# Only the codes this demo actually emits. An unknown code must fall back to plain text,
-# never render as literal escape junk on camera.
-SGR = {"1": ("bold", True), "0": ("reset", None), "33": ("fg", (210, 168, 66)),
-       "32": ("fg", (86, 211, 100)), "31": ("fg", (255, 123, 114)), "36": ("fg", (121, 192, 255))}
+# 🔴 THE RESET CODES ARE AS LOAD-BEARING AS THE COLOUR ONES, and leaving them out does not
+# look like a bug — it looks like a design. Measured: the walkthrough emits exactly two
+# codes, `33` around one word and `39` to put the colour back. `39` was missing here, so
+# the amber leaked from that word to the end of the reel and the whole terminal looked
+# deliberately retro. Caught by looking at a frame, not by anything failing.
+SGR = {
+    "0": ("reset", None),      # all attributes off
+    "1": ("bold", True),
+    "22": ("bold", False),     # normal intensity
+    "39": ("fg", FG),          # default foreground — the counterpart of every colour below
+    "30": ("fg", (110, 118, 129)), "31": ("fg", (255, 123, 114)), "32": ("fg", (86, 211, 100)),
+    "33": ("fg", (210, 168, 66)), "34": ("fg", (121, 192, 255)), "35": ("fg", (210, 168, 255)),
+    "36": ("fg", (121, 192, 255)), "37": ("fg", FG),
+}
 ANSI = re.compile(r"\x1b\[([0-9;]*)m")
 
 
@@ -51,7 +61,7 @@ def spans(text, state):
             if kind == "reset":
                 state["fg"], state["bold"] = FG, False
             elif kind == "bold":
-                state["bold"] = True
+                state["bold"] = val
             elif kind == "fg":
                 state["fg"] = val
         pos = m.end()
@@ -102,14 +112,20 @@ def render(casts, out_mp4):
     cols, rows = int((W - 32) // cw), int((H - 24) // lh)
 
     # One timeline across all casts, each starting where the previous ended.
-    timeline, offset = [], 0.0
+    timeline, offset, last_hold = [], 0.0, 0.0
     for spec in casts:
         path, _, hold = spec.partition(":")
         head, evs = load(path)
         for t, _, data in evs:
             timeline.append((offset + t, data))
-        offset += (evs[-1][0] if evs else 0) + float(hold or 0) + 1.2   # hold, then a beat
-    total = timeline[-1][0] + 2.0 if timeline else 0
+        last_hold = float(hold or 0)
+        offset += (evs[-1][0] if evs else 0) + last_hold + 1.2   # hold, then a beat
+    # 🔴 The LAST cast's hold has to be added here, not just to `offset`. Nothing follows
+    # it, so its hold vanished and the closing frame got the 2s tail alone — measured: the
+    # reel came out 209s where the composition called for 229, and the narrator would have
+    # had two seconds for the closing line. The parameter was accepted and silently ignored
+    # for exactly one cast, which is the position it matters most.
+    total = timeline[-1][0] + last_hold + 2.0 if timeline else 0
 
     tmp = tempfile.mkdtemp(prefix="reel-")
     screen, state, i, n = [[]], {"fg": FG, "bold": False}, 0, 0

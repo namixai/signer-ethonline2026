@@ -10,6 +10,9 @@ over the limit are printed with the words that must go.
 import re, sys
 
 LIMIT_WPM = float(sys.argv[2]) if len(sys.argv) > 2 else 145.0
+# Total reel length in seconds. Without it the last block gets an invented window, and the
+# last block is where a script most often overruns — the one place a guess is worst.
+REEL_SECONDS = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
 
 
 def cues(path):
@@ -28,13 +31,13 @@ rows = cues(sys.argv[1])
 over = 0
 print(f"{'cue':>6}  {'window':>7}  {'words':>5}  {'wpm':>5}  screen")
 for i, (t, w, screen) in enumerate(rows):
-    span = (rows[i + 1][0] - t) if i + 1 < len(rows) else 8
+    span = (rows[i + 1][0] - t) if i + 1 < len(rows) else max(REEL_SECONDS - t, 4)
     wpm = w / span * 60 if span else 0
     flag = "  🔴 длинно" if wpm > LIMIT_WPM else ""
     over += 1 if wpm > LIMIT_WPM else 0
     print(f"{t//60}:{t%60:02d}  {span:5.0f} с  {w:5}  {wpm:5.0f}{flag}  {screen}")
 total_w = sum(w for _, w, _ in rows)
-total_s = rows[-1][0] + 8 - rows[0][0]
+total_s = (REEL_SECONDS or rows[-1][0] + 8) - rows[0][0]
 print(f"\nвсего {total_w} слов на {total_s} с = {total_w/total_s*60:.0f} слов/мин "
       f"(предел {LIMIT_WPM:.0f}); блоков сверх предела: {over}")
 sys.exit(1 if over else 0)
