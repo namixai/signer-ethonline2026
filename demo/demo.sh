@@ -8,12 +8,23 @@
 # wrong artifact. Everything below is a command a stranger can run. Frame 3 needs nothing
 # from us at all — no account, no token, no permission.
 #
-# 🔴 SECRETS: this script never prints a token. Where one is needed it prints the variable
-# NAME and whether it is set. If a frame cannot run, it says so loudly and keeps going;
-# it never quietly skips, because a demo that silently drops its hardest frame is a demo
-# that lies by omission.
+# 🔴 SECRETS, and the correction that matters. This script never prints a token it SENDS
+# — that was always true and it was never the risk. The dangerous credential travels the
+# other way: in the default mode the client is the one who submits the order, so `/sign`
+# answers with a `headers` map carrying the venue key (`X-MBX-APIKEY`, `KC-API-SIGN`, and
+# on OKX the passphrase). The old filter hid four field NAMES and printed everything else,
+# so those headers went to the screen we were about to film — and the one field it did
+# name, `signature`, printed too, because it is an object and the guard began with
+# `isinstance(v, str)`. Every response body now goes through `redact.py`, which prints an
+# ALLOW-list and hides the rest; run `./precheck.sh` before filming and read its verdict.
+# If a frame cannot run, it says so loudly and keeps going; it never quietly skips,
+# because a demo that silently drops its hardest frame is a demo that lies by omission.
 
 set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# Единственное место, где тело ответа превращается в строки на экране.
+REDACT="$HERE/redact.py"
 
 DEMO_GATEWAY="${DEMO_GATEWAY:-https://signer-demo.usenami.io:8443}"
 # Frames 1-2 need a gateway with an armed venue and a token for it. Neither is public.
@@ -62,19 +73,7 @@ JSON
         -H "Authorization: Bearer ${SIGNER_TOKEN}" -H 'content-type: application/json' \
         -d "$body")
   code=$(printf '%s' "$out" | tail -1)
-  printf '%s' "$out" | sed '$d' | python3 -c '
-import sys,json
-try:
-    d=json.load(sys.stdin)
-except Exception:
-    print("   (non-JSON body)"); raise SystemExit
-# A signature is long and boring on screen; show that it exists and its shape, not the value.
-for k,v in d.items():
-    if isinstance(v,str) and len(v)>24 and k.lower() in ("signature","r","s","sig"):
-        print(f"   {k}: <{len(v)} chars> (not printed)")
-    else:
-        print(f"   {k}: {v}")
-'
+  printf '%s' "$out" | sed '$d' | python3 "$REDACT"
   note "HTTP ${code}  — expected 200 with a signature present"
 }
 
@@ -89,7 +88,7 @@ run_frame_2() {
   local out
   out=$(curl -s --max-time 25 -H "Authorization: Bearer not-a-real-token" \
         "${DEMO_GATEWAY}/account/binance")
-  printf '   %s\n' "$out"
+  printf '%s' "$out" | python3 "$REDACT"
   printf '%s' "$out" | python3 -c '
 import sys,json
 try: d=json.load(sys.stdin)
@@ -113,7 +112,7 @@ JSON
 )
   out=$(curl -s -w '\n%{http_code}' --max-time 25 -X POST "${SIGNER_GATEWAY}/sign" \
         -H "Authorization: Bearer ${SIGNER_TOKEN}" -H 'content-type: application/json' -d "$body")
-  printf '   %s\n' "$(printf '%s' "$out" | sed '$d')"
+  printf '%s' "$out" | sed '$d' | python3 "$REDACT"
   note "HTTP $(printf '%s' "$out" | tail -1) — expected 403, rule_class=policy"
 }
 
