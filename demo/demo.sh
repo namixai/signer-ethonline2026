@@ -24,9 +24,17 @@ VENUE="${VENUE:-hyperliquid_testnet}"
 FRAME="${2:-all}"
 [ "${1:-}" = "--frame" ] || FRAME=all
 
-bar() { printf '\n\033[1m── %s\033[0m\n' "$1"; }
-note() { printf '   %s\n' "$1"; }
-stub() { printf '\n\033[1;33m── STUB: %s\033[0m\n' "$1"; }
+# 🔴 PACING IS OFF BY DEFAULT, and that is the point. A demo that sleeps for a stranger
+# who just wants the output wastes their time; a demo recorded at machine speed is
+# unreadable on camera. So the pause is a knob, the default is zero, and the recording is
+# a REAL run with the knob turned up — not a fast run with timings painted on afterwards.
+# python3 is already a hard dependency of this script (checked below), so no new one.
+PAUSE_MS="${DEMO_PAUSE_MS:-0}"
+pause() { [ "${PAUSE_MS}" -gt 0 ] 2>/dev/null && python3 -c "import time,sys; time.sleep(int(sys.argv[1])/1000)" "${1:-$PAUSE_MS}" || true; }
+
+bar() { printf '\n\033[1m── %s\033[0m\n' "$1"; pause $((PAUSE_MS * 3)); }
+note() { printf '   %s\n' "$1"; pause; }
+stub() { printf '\n\033[1;33m── STUB: %s\033[0m\n' "$1"; pause $((PAUSE_MS * 2)); }
 
 need() { command -v "$1" >/dev/null || { echo "missing: $1"; exit 2; }; }
 need curl; need python3

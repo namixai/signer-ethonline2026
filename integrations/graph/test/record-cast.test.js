@@ -66,14 +66,38 @@ test('🔴 the committed cast still describes the CURRENT walkthrough', () => {
   const lines = src.trim().split('\n');
   const text = lines.slice(1).map((l) => JSON.parse(l)[2]).join('');
 
-  const frames = (text.match(/─{72}/g) || []).length / 2;
-  assert.equal(frames, 8, `в записи ${frames} кадров, в проходе 8 — перезапиши: npm run demo:cast`);
+  // 🔴 THE MARKERS ARE READ OUT OF THE SOURCE, not typed here. The first version of this
+  // guard listed four fixed strings — that is a COPY of what the cast said when the guard
+  // was written, not the thing the cast must agree with. Measured 2026-09-07: the demo's
+  // whole output was translated to English and this suite stayed green, because nothing
+  // here ever looked at demo.js. A guard whose reference is a duplicate can only catch
+  // the duplicate changing.
+  const demoSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'demo.js'), 'utf8');
+  const titles = [...demoSrc.matchAll(/await step\(\s*\d+\s*,\s*'((?:[^'\\]|\\.)*)'/g)]
+    .map((m) => m[1].replace(/\\'/g, "'"));
+  assert.ok(titles.length >= 5, `в demo.js найдено ${titles.length} шагов — разбор заголовков сломался`);
 
-  for (const marker of ['ONDO', 'снимок собран', 'НЕ ПОЛУЧАЕТ ПОДПИСЬ', 'Граница']) {
-    assert.ok(text.includes(marker), `запись не содержит «${marker}» — она отстала от кода`);
+  const frames = (text.match(/─{72}/g) || []).length / 2;
+  assert.equal(frames, titles.length,
+    `в записи ${frames} кадров, а в demo.js ${titles.length} — перезапиши: npm run demo:cast`);
+
+  for (const title of titles) {
+    // Compare on the part before any escape sequence a title may carry.
+    const needle = title.split('\\u')[0].slice(0, 40);
+    assert.ok(text.includes(needle),
+      `запись не содержит заголовок «${needle}» — она отстала от кода, перезапиши: npm run demo:cast`);
   }
   assert.ok(!text.includes('WETH'), 'запись всё ещё показывает прежний символ');
   assert.ok(!text.includes('�'), 'в записи символы замены — разрез многобайтового символа');
+
+  // The header title is what a player shows above the recording. It lived in the recorder
+  // as a Russian string long after the walkthrough itself was English, and nothing looked
+  // at it — the guard above reads the OUTPUT, and a title is metadata.
+  const recorder = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'record-cast.mjs'), 'utf8');
+  const wanted = recorder.match(/title:\s*'((?:[^'\\]|\\.)*)'/)?.[1];
+  assert.ok(wanted, 'в рекордере не найден title — разбор сломался');
+  assert.equal(JSON.parse(lines[0]).title, wanted,
+    'заголовок записи разошёлся с рекордером — перезапиши: npm run demo:cast');
 
   const duration = JSON.parse(lines[lines.length - 1])[0];
   assert.ok(duration > 120 && duration < 240, `длительность ${duration.toFixed(0)} с вне окна 2–4 мин`);
