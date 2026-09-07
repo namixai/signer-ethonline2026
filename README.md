@@ -37,10 +37,16 @@ the venue would accept anything it signed. After that approval no human approved
 and no human touched the key.
 
 **What that is not.** Our own account and our own money, so nobody has trusted us with
-theirs yet. No external audit. Order signing has run on two venues — Binance Futures since
-27 July, Hyperliquid since 16 August — and that is the whole list. First only in the sense
-of our own first; the rules we hold ourselves to are in `CONTINUITY.md`, and one of them
-forbids the other reading.
+theirs yet. No external audit. Order signing has run on three venues since — Binance
+Futures 27 July, Hyperliquid 16 August, OKX 18 August — and the proof is not the same kind
+on each: Binance and Hyperliquid both have a completed round trip, entry filled and
+position closed (Binance 27 July, Hyperliquid **19 August** — three days after the venue
+went live, not the same day; the 16 August Hyperliquid event was a cap-probe and cancel
+that never filled, see `CONTINUITY.md`). OKX has a signed order accepted into the book and
+cancelled — not a completed trade. That is the whole list, and the three are not
+interchangeable in a sentence. First only in the sense of our own first; the rules we hold
+ourselves to are in `CONTINUITY.md`, and one of them forbids the
+other reading.
 
 Nothing here is renamed or backdated. The Continuity track allows pre-existing work;
 concealing it would be both a rule violation and a pointless one, since commit dates outlive
@@ -109,9 +115,11 @@ policy".
 ## Verify the product itself, not just this repo
 
 The interesting claim is not in this repository. It is that you can rebuild the enclave
-image from a clean public clone and get the same measurement the live service reports.
-That procedure lives in [namixai/signer](https://github.com/namixai/signer), and it is
-the one thing worth an hour of a reviewer's time.
+image from a clean public clone and get the same measurement a running box reports — read
+live from its own `/attestation` endpoint, not quoted here, because it changes on every
+rotation and production and demo do not share one. That procedure lives in
+[namixai/signer](https://github.com/namixai/signer), and it is the one thing worth an hour
+of a reviewer's time.
 
 ## AI
 
