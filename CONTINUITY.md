@@ -5,7 +5,8 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-08-16 (demo storyboard + runnable script).
+**Last updated:** 2026-09-07 (the window section below rewritten under fact — see the diff
+history of this file for the 2026-08-16 plan as first written; nothing there is deleted).
 
 ## The position in one sentence
 
@@ -49,14 +50,70 @@ without it the integrations written in the window would be guesswork.
 | **2026-08-16** | **the enclave signed an order Hyperliquid accepted, and the cancel was accepted**; the same policy signed 0.010 BNB under the cap and refused 0.050 | product milestone, not hackathon work — the signing path predates the event |
 | **2026-08-15** | **position-NFT permit vectors** — 7 cases, two paths, every domain separator anchored against the deployed contract, 7 falsification mutations | bench (`vectors/`), does not ship as submission code |
 
-## What will be written IN THE WINDOW (from 4 September)
+## What has been written IN THE WINDOW (from 4 September) — status as of 7 September
 
-- The 1inch Fusion and Uniswap Permit2 integrations — **written fresh**, already knowing how.
-- Integration with 0G Compute TEE (the agent's reasoning half).
-- "Data as a policy input": snapshot signature checked, freshness judged by enclave time,
-  refusal before signing.
-- The verifier page.
-- README for the submission, the demo video, and the remaining spec artefacts.
+The 16 August plan and the actual window diverged. Two items on that plan were cut, one
+shipped in a different, narrower shape than written, and three integrations happened that
+were not on the plan at all. All of it below — cut items included — because a page that
+quietly drops what it can't deliver is worse than one that says so.
+
+### What the 16 August plan promised
+
+| promised | status | what actually happened |
+|---|---|---|
+| 1inch Fusion integration | **cut** | never started as integration code in this window. What exists is the 4 August knowledge and the 5 August spec, both already listed above as pre-window |
+| Uniswap Permit2 integration | **partial — digest only, does not sign** | `integrations/graph/src/permit2.js`, written in the window: builds and checks the EIP-712 digest against the 14 August spec, so the spec is runnable rather than read. It does not sign. Permit2 signing needs a new enclave action that does not exist, and — separately — is gated on the next key rotation; neither is a decision this document makes |
+| Integration with 0G Compute TEE | **cut** | not a scope choice on our side: 0G disappeared from ETHOnline's own public prize roster on 28 August. The individual 0G prize page is still reachable; the general prize list no longer lists it. We were building toward a track that stopped being listed, and did not replace it with a different 0G integration |
+| "Data as a policy input": snapshot signature checked, freshness judged by enclave time, refusal before signing | **shipped, in a corrected shape** | see below — the enclave-time framing as originally written overclaimed, and the actual claim is narrower |
+| The verifier page | **cut** | not built this window. The 8 August spec (below) and the 6 August WASM proof-of-concept exist; the page connecting them does not. The window's engineering time went to the three integrations below instead, none of which were on this plan |
+| README for the submission, the demo video, and the remaining spec artefacts | **README: written, one oversell caught and fixed. Video: not made** | the top-level README claimed "runs in one command and needs no account, no key and no network" — true for the offline path, false for the path that verifies live against a deployed contract. Fixed to name both paths and what each costs. The demo video does not exist yet: `demo/STORYBOARD-hyperliquid.md` and a runnable `demo/demo.sh` do |
+
+### The reworded item: data as a policy input
+
+🔴 The claim as first written said market data would be "an input to enclave policy" — that
+overclaimed. The enclave does not parse this snapshot; no enclave action exists that verifies
+a signed snapshot and applies a band, and building one was ruled out for this window. What
+exists instead: a signed statement we make about our own check (schema
+`usenami.market-reference.dex.v1`, sent to `/sign-data`, so the enclave still owns
+canonicalisation and the signature — we do not run a second canonicaliser), and a rule
+(`judgeOrder`) that compares an order's price against a ±5%-by-default band computed from
+that snapshot and refuses outside it. It catches a stale quote, a manipulated route, or a
+fat-finger price with no relationship to the market. It does not claim best execution —
+nothing here promises the best price, only a sane one. The honest claim is "the price was
+checked before a signature was requested," not "market data is an input to enclave policy."
+
+### What was written that was not on the 16 August plan at all
+
+**The Graph integration.** A live-data path — attestation check, usability check, indexer
+resolution — plus the gate and the snapshot rule above, both of which consume it. Tests green
+against live data and against an offline fixture set (a few cases skipped by name where they
+need live network access), an 8-frame demo that runs end to end. A test count is not quoted
+here on purpose: a number typed next to the code drifts from the code the moment either one
+changes, and this repository has already caught itself doing exactly that once — the count
+lives in the code, not in this page. `namixai/signer-ethonline2026#5`.
+
+**A gate that refuses to ask for a signature, not one that reports after asking.** Before a
+signature is requested, the code checks two on-chain registries (Base and World Chain) for a
+registered human behind the calling agent. Two distinct refusal reasons, kept apart on
+purpose: `no_registered_human` (the registry was reached and confirmed absence) and
+`human_unverified` (the check could not be completed — the registry was unreachable or gave
+an answer the code doesn't trust) — collapsing them would send an operator to re-register an
+agent that was already registered, instead of fixing a broken lookup. 🔴 The receipt names
+where the decision was made — `decided_by: gateway_before_enclave` — and a test pins that
+exact string so the claim can't drift to "the enclave refused" if someone else edits the file
+later.
+
+**World ID: our code reaches their live verifier and is recognized by it — a successful
+verification has not been observed.** The RP is registered on-chain in both production and
+staging, and the `agent-signature-gate` action is configured in both. A live probe with a
+deliberately wrong RP against a correct request body returns a different error
+(`app_not_migrated`) than the same probe with our real RP (`verification_error`, meaning the
+request reached proof checking) — that contrast is what proves the identifier is live and
+recognized, not a claim taken on faith. What this does not show: World has never returned a
+"verified" response to us, and won't until a real proof arrives from a Sandbox App — our
+application for World ID Sandbox access is still pending on their side. **A sandbox-verified
+request path is not the same claim as being registered in AgentBook, and this document does
+not conflate the two.**
 
 ## Public spec artefacts (the set is kept from day one)
 
