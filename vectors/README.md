@@ -15,12 +15,20 @@ npm ci && node verify_sdk.mjs   # path B — Uniswap's own SDK, plus viem
 
 # Position NFTs — the other signature in the swap path
 python3 verify_nft_ours.py      # path A, and it also checks the pinned on-chain domains
-python3 falsify_nft.py          # seven mutations
+python3 falsify_nft.py          # planted mutations; every one must be caught (the run prints the count)
 node verify_nft_sdk.mjs         # path B — viem
 
 ./anchor_onchain.sh             # optional, needs network + foundry: ask the deployed contracts
 node onchain_fieldorder.mjs     # optional, needs network: let Permit2 judge our field order
 ```
+
+🔴 **No count is written down in this file, and that is deliberate.** Every script derives
+what it reports from the data it just read — `len(cases)`, `len(checks)` — so the run is the
+only place a number exists. A count repeated in prose is a second source that cannot be
+executed, and by 2026-09-07 both had already drifted: this file promised seven NFT mutations
+while the script planted eight, and CI promised six Permit2 defects while the script planted
+seven. Nothing was broken — the documents were describing an older set, silently. If you
+want a number, run the thing and read what it prints.
 
 ## The one thing the offline paths cannot check
 
@@ -60,7 +68,7 @@ The single fact that makes the NFT set worth having: **v3 and v4 share the struc
 Same struct hash, different digest. A "the type hash matches" check passes and proves
 nothing.
 
-The first two need nothing but Python 3. No network, no packages, no Ethereum library.
+The Python paths need nothing but Python 3. No network, no packages, no Ethereum library.
 `npm ci` needs the network once; after that path B runs offline too.
 
 ## Why the paths are actually independent
@@ -83,7 +91,7 @@ implementations agreeing with each other is not the same as agreeing with the ch
 
 ## What the cases cover
 
-Eleven cases across both halves of Permit2 — `PermitSingle`, `PermitBatch`,
+Both halves of Permit2 — `PermitSingle`, `PermitBatch`,
 `PermitTransferFrom`, `PermitBatchTransferFrom` and both witness variants, on chain 1 and
 on Base. Each carries a `why` field saying which mistake it exists to catch. Highlights:
 
