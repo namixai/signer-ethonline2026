@@ -4,9 +4,10 @@
 Standardized Subgraph** on the `DEX AMM (Extended)` schema, so one query pattern spans
 many deployments with **no code change**.
 
-**How to re-run it:** `npm run leverage` (add `X402_PRIVATE_KEY` for the paid path; without
-it the script reads the free price challenge and says, in its own output, that this proves
-nothing about the data).
+**How to re-run it:** `X402_PRIVATE_KEY=0x… npm run leverage`. The key is **required** to
+reproduce the table below: every row is a paid query, $0.01 in USDC on Base. Without it the
+script runs quote-only and says in its own output that this proves nothing about the data —
+a fabricated subgraph id returns the same price challenge, measured.
 
 ---
 
@@ -15,7 +16,7 @@ nothing about the data).
 The id in `src/fetch.js` is byte-for-byte the one Messari's deployment registry lists for
 `uniswap-v3-ethereum`:
 
-```
+```text
 src/fetch.js:26          4cKy6QQMc5tpfdx8yxfYeb9TLZmgLQe44ddW1G7NwkA6
 messari/subgraphs        uniswap-v3-ethereum  status=prod
   deployment/deployment.json → services.decentralized-network.query-id

@@ -104,9 +104,19 @@ export async function measureLeverage({
       continue;
     }
 
-    const token = body?.data?.tokens?.[0] ?? null;
     const meta = body?.data?._meta ?? null;
-    const missing = token ? STANDARD_FIELDS.filter((f) => !(f in token)) : STANDARD_FIELDS;
+
+    // 🔴 THREE CASES, and collapsing the last two invents a finding. Measured before the
+    // fix: a deployment answering `tokens: []` was reported as breaking the standard on
+    // BOTH deployments at once — a false alarm that exits 1 and would have us "fixing"
+    // a schema that is fine.
+    //   tokens absent / not an array  -> the shared query was NOT honoured: all fields missing
+    //   tokens: []                    -> honoured, no rows matched: says NOTHING about fields
+    //   tokens: [t]                   -> honoured with a sample: check the fields on it
+    const tokensField = body?.data?.tokens;
+    const tokens = Array.isArray(tokensField) ? tokensField : null;
+    const token = tokens?.[0] ?? null;
+    const missing = tokens === null ? STANDARD_FIELDS : token == null ? [] : STANDARD_FIELDS.filter((f) => !(f in token));
 
     let requestCID = null;
     try {
@@ -119,6 +129,9 @@ export async function measureLeverage({
       ...d,
       mode: 'paid',
       ok: missing.length === 0 && meta != null,
+      // Stated, because "no fields missing" reads like a pass and an empty result is not
+      // one — it is simply an absence of evidence either way.
+      sampled: token != null,
       requestCID,
       missingStandardFields: missing,
       headBlock: meta?.block?.number ?? null,
@@ -147,6 +160,7 @@ export async function measureLeverage({
   const checked = results.some((r) => r.ok) || mismatched.length > 0;
 
   const paidRun = results.some((r) => r.mode === 'paid');
+  const sampledCount = results.filter((r) => r.sampled).length;
 
   return {
     // 🔴 The summary must not read stronger than the run. In free mode every per-result
@@ -155,9 +169,18 @@ export async function measureLeverage({
     // claim the run supports is spelled out rather than left to inference.
     mode: paidRun ? 'paid' : 'quote-only',
     claimSupported: paidRun
-      ? (attestedSameRequest
-          ? 'one query, several deployments of the shared schema, identical requestCID attested by independent indexers'
-          : 'deployments answered, but the request bytes were NOT attested identical — leverage not demonstrated')
+      ? (mismatched.length > 0
+          // 🔴 A matching requestCID proves the REQUEST was identical. It says nothing
+          // about the answer. Reporting the strong claim while `standardizationBroken`
+          // is set (and the process exits 1) would have the summary contradict its own
+          // findings — the same defect as the free/paid case one axis over, which is why
+          // it survived: that one was fixed as an instance, not as a class.
+          ? 'a deployment FAILED the shared-schema check — the leverage claim does NOT stand for it, whatever the requestCIDs say'
+          : !attestedSameRequest
+            ? 'deployments answered, but the request bytes were NOT attested identical — leverage not demonstrated'
+            : sampledCount === 0
+              ? 'the shared query was honoured everywhere and the request bytes are attested identical, but NO deployment returned a row — no field was actually observed'
+              : 'one query, several deployments of the shared schema, identical requestCID attested by independent indexers')
       : 'NOTHING about the data: only that the gateway prices this query for these ids. A fabricated id returns the same challenge (measured).',
     checked,
     oneQuery,
@@ -170,6 +193,7 @@ export async function measureLeverage({
     docs: 'https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/',
     deploymentsQueried: results.length,
     deploymentsAnswered: answered.length,
+    deploymentsSampled: sampledCount,
     codeChangesBetweenDeployments: 0,
     standardizationBroken: mismatched.length > 0 ? mismatched.map((m) => ({ slug: m.slug, missing: m.missingStandardFields })) : null,
     results,

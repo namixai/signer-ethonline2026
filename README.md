@@ -129,7 +129,12 @@ honest version of that is in `integrations/graph/LEVERAGE-EVIDENCE.md`, together
 measurement: the identical query sent to two deployments on two chains came back with the
 **same attested `requestCID`** from two independent indexers, while `responseCID` and
 `subgraphDeploymentID` differ. One query pattern, several deployments, zero lines changed —
-and the parties attesting to it have no stake in our claim. `npm run leverage` re-runs it.
+and the parties attesting to it have no stake in our claim.
+
+`npm run leverage` re-runs it — **with `X402_PRIVATE_KEY` set**, because that measurement is
+made of paid queries ($0.01 each, USDC on Base). Without the key the script runs in
+quote-only mode and says so in its own output: it then proves nothing about the data, since
+a fabricated subgraph id returns the same price challenge. Measured, not assumed.
 
 ⚠️ **Where it runs:** outside the enclave. An enclave has no network, so none of this can
 happen inside one. The claim is "checked before a signature was requested", never "enclave

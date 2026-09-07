@@ -149,3 +149,47 @@ test('🔴 the numbers pinned in LEVERAGE-EVIDENCE.md still match the code', () 
   // reading Messari's deployment, so the document must quote the id the code actually uses.
   assert.ok(doc.includes(STANDARDIZED_DEPLOYMENTS[0].id), 'боевой идентификатор в документе разошёлся с кодом');
 });
+
+// ── Found in review of PR #9. Both were real, both measured before accepting. ──
+
+const withTokens = (tokens) => async () => ({
+  ok: true, status: 200, hasAttestation: true, attestationHeader: JSON.stringify({ requestCID: CID }),
+  rawBody: JSON.stringify({ data: { ...(tokens === undefined ? {} : { tokens }), _meta: { block: { number: 1, timestamp: 1 }, hasIndexingErrors: false } } }),
+});
+const GOOD_TOKEN = [{ symbol: 'X', lastPriceUSD: '1', lastPriceBlockNumber: '1' }];
+
+test('🔴 an EMPTY token list is not a broken schema — it is no sample', async () => {
+  // Measured before the fix: `tokens: []` marked BOTH deployments as breaking the
+  // standard and exited 1. A false alarm sends someone to fix a schema that is fine.
+  const r = await measureLeverage({ deployments: two, paid: true, paidImpl: withTokens([]) });
+  assert.equal(r.standardizationBroken, null, 'пустой список выдан за нарушение стандарта');
+  assert.equal(r.deploymentsSampled, 0);
+  assert.match(r.claimSupported, /NO deployment returned a row/, 'отсутствие выборки должно быть сказано, а не пропущено');
+});
+
+test('🔴 an ABSENT tokens field IS a broken schema — the two must not collapse', async () => {
+  const r = await measureLeverage({ deployments: two, paid: true, paidImpl: withTokens(undefined) });
+  assert.equal(r.standardizationBroken?.length, 2, 'отсутствие поля проглочено вместе с пустым списком');
+});
+
+test('🔴 a matching requestCID must NOT rescue a deployment that failed the schema check', async () => {
+  // The requestCID proves the REQUEST was identical. It says nothing about the answer.
+  // Before the fix the summary announced the strong claim while standardizationBroken
+  // was set and the process exited 1 — the summary contradicting its own findings.
+  let first = true;
+  const r = await measureLeverage({
+    deployments: two, paid: true,
+    paidImpl: async () => { const f = first; first = false; return withTokens(f ? GOOD_TOKEN : [{ id: '0x1' }])(); },
+  });
+  assert.equal(r.attestedSameRequest, true, 'предпосылка теста исчезла: CID больше не совпадают');
+  assert.equal(r.standardizationBroken.length, 1);
+  assert.match(r.claimSupported, /FAILED the shared-schema check/);
+  assert.doesNotMatch(r.claimSupported, /identical requestCID attested/, 'сильный клейм прозвучал поверх находки');
+});
+
+test('and the healthy case still says the strong thing', async () => {
+  const r = await measureLeverage({ deployments: two, paid: true, paidImpl: withTokens(GOOD_TOKEN) });
+  assert.equal(r.standardizationBroken, null);
+  assert.equal(r.deploymentsSampled, 2);
+  assert.match(r.claimSupported, /identical requestCID attested by independent indexers/);
+});
