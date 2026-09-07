@@ -41,6 +41,20 @@ SGR = {
     "36": ("fg", (121, 192, 255)), "37": ("fg", FG),
 }
 ANSI = re.compile(r"\x1b\[([0-9;]*)m")
+# 🔴 EVERY OTHER ESCAPE MUST BE REMOVED, not passed through. The header comment above
+# promised an unknown code would fall back to plain text; it did the opposite — `\x1b[1G`
+# and `\x1b[0K`, which npm emits to rewrite a line, were drawn literally as "[1G [0K" at
+# the top of a frame. Escape junk on camera, in the exact place the comment said it would
+# not be. Stripped here: this renderer models an append-only screen, so cursor movement
+# and erase have nothing to do and only their text form survives.
+OTHER_CSI = re.compile(r"\x1b\[[0-9;?]*[A-La-ln-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]|\x1b[=>]")
+# 🔴 TWO OF THEM ARE NOT NOISE AND MUST BE OBEYED, or the screen keeps what a terminal
+# would have wiped. npm draws a spinner and erases it with `ESC[1G ESC[0K`; strip both and
+# the braille character survives forever — a stray glyph above a heading, on camera.
+# `ESC[1G` is a carriage return by another name, and `ESC[K` clears to end of line.
+COL0 = re.compile(r"\x1b\[1?G")
+ERASE_EOL = re.compile(r"\x1b\[[02]?K")
+ERASE = "\x00"   # sentinel the character loop understands; never appears in real output
 
 
 def load(path):
@@ -52,6 +66,8 @@ def load(path):
 
 def spans(text, state):
     """Split text into (string, colour, bold) runs, carrying SGR state across chunks."""
+    text = ERASE_EOL.sub(ERASE, COL0.sub("\r", text))
+    text = OTHER_CSI.sub("", text)
     out, pos = [], 0
     for m in ANSI.finditer(text):
         if m.start() > pos:
@@ -128,7 +144,7 @@ def render(casts, out_mp4):
     total = timeline[-1][0] + last_hold + 2.0 if timeline else 0
 
     tmp = tempfile.mkdtemp(prefix="reel-")
-    screen, state, i, n = [[]], {"fg": FG, "bold": False}, 0, 0
+    screen, state, i, n, col = [[]], {"fg": FG, "bold": False}, 0, 0, 0
     for frame in range(int(total * FPS) + 1):
         now = frame / FPS
         while i < len(timeline) and timeline[i][0] <= now:
@@ -136,14 +152,22 @@ def render(casts, out_mp4):
                 for ch in chunk:
                     if ch == "\n":
                         screen.append([])
+                        col = 0
                     elif ch == "\r":
-                        pass
+                        col = 0
+                    elif ch == ERASE:
+                        del screen[-1][col:]
                     elif ch in INVISIBLE:
                         pass
                     else:
-                        if len(screen[-1]) >= cols:
+                        if col >= cols:
                             screen.append([])
-                        screen[-1].append((ch, colour, is_bold))
+                            col = 0
+                        if col < len(screen[-1]):
+                            screen[-1][col] = (ch, colour, is_bold)
+                        else:
+                            screen[-1].append((ch, colour, is_bold))
+                        col += 1
             i += 1
         img = Image.new("RGB", (W, H), BG)
         d = ImageDraw.Draw(img)
