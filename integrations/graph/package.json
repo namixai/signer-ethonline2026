@@ -12,7 +12,8 @@
     "drift:world": "node src/world-drift.js",
     "demo": "node src/demo.js",
     "demo:cast": "node scripts/record-cast.mjs demo.cast",
-    "test:offline": "GRAPH_SNAPSHOT_OFFLINE=1 node --test test/*.test.js"
+    "test:offline": "GRAPH_SNAPSHOT_OFFLINE=1 node --test test/*.test.js",
+    "leverage": "node src/leverage.js"
   },
   "dependencies": {
     "@x402/evm": "^2.24.0",

@@ -62,19 +62,24 @@ specs/         protocol specs read from source, each pinned to a commit
 vectors/       Permit2 test vectors, two independent paths + an on-chain anchor
 plans/         PLAN.md, and prompts/ — the prompts the AI actually ran on
 scripts/       scrub-check.sh, the hygiene gate that runs in CI
+integrations/  the code written in the window — see Code below
+demo/          demo.sh and the Hyperliquid storyboard: the demo as a script, not a video
 ```
 
 Start with `vectors/README.md` if you want to check something rather than read something.
 **There are two paths, and they cost different things — we would rather say so than have you
 find out.**
 
-- **Offline, one command, nothing needed from anyone.** `python3 verify_ours.py` and
+- **Offline, one command, nothing needed from anyone.** `cd vectors` first — every command
+  in this section runs from there, and an earlier version of this list omitted that, so the
+  "one command" claim failed at the reader's prompt. `python3 verify_ours.py` and
   `python3 falsify.py` use the standard library only: no account, no key, no network. The
   second one plants deliberate defects and every one must be caught — a suite that only
   proves the right answer passes just as happily when both sides share a mistake. The run
   prints how many; we deliberately do not repeat the number here, because a count in prose
   goes stale the moment someone adds a case, and this one already had.
-- **Against Uniswap's own SDK, which needs the network once.** `npm ci && node verify_sdk.mjs`
+- **Against Uniswap's own SDK, which needs the network once.** Still from `vectors/`:
+  `npm ci && node verify_sdk.mjs`
   downloads viem and the Permit2 SDK. It is worth running because it checks our encoder
   against theirs rather than against itself, but it is not the one-command claim, and
   `onchain_fieldorder.mjs` additionally talks to a chain.
@@ -86,12 +91,20 @@ reader to discover the gap.
 ## Code
 
 `integrations/graph/` — the reading and verification code, written during the event window
-(2026-09-02..05). Node, no build step:
+(2026-09-02..05) and migrated into this repository on 2026-09-07, which is why its history
+here is a single commit rather than four days of them. Said out loud because `CONTINUITY.md`
+invites exactly this check. Node, no build step:
 
 ```bash
 cd integrations/graph && npm ci && npm test    # the run prints the count
-npm run demo                                    # the whole walkthrough, ~2.6 min
+npm run demo                                   # the walkthrough; finishes in about a second
+npm run leverage                               # one query, several standardized deployments
 ```
+
+`npm run demo` prints as fast as the terminal allows. To watch it at reading speed set
+`DEMO_STEP_PAUSE_MS=22000`, or play the recording committed as
+`integrations/graph/demo.cast` (asciinema). An earlier version of this line promised the
+command itself took minutes; that was true of the recording, not of the command.
 
 What it does, in the order the walkthrough shows it: ask The Graph's keyless x402 gateway
 for a price, verify the indexer's attestation over the **exact** response bytes, resolve the
@@ -99,6 +112,29 @@ allocation to a staked indexer on chain, decide separately whether the reading i
 assemble a canonical snapshot that states what was **not** checked as well as what was, and
 apply the rule that follows from it. Plus the gate that refuses a signature to an agent with
 no registered human behind it.
+
+### The subgraph is a Messari Standardized Subgraph
+
+Worth stating plainly, because a judge on the Composable-or-Standardized track is looking
+for exactly this and cannot see it otherwise. The deployment this code reads in production,
+`4cKy6QQMc5tpfdx8yxfYeb9TLZmgLQe44ddW1G7NwkA6`, is the one Messari's own
+[deployment registry](https://github.com/messari/subgraphs/blob/master/deployment/deployment.json)
+lists for `uniswap-v3-ethereum`, on the
+[`DEX AMM (Extended)`](https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/)
+standardized schema.
+
+We did not choose it for the track. We had been reading it since the first live query and
+only found out on 2026-09-07, while measuring whether the track was open to us at all. The
+honest version of that is in `integrations/graph/LEVERAGE-EVIDENCE.md`, together with the
+measurement: the identical query sent to two deployments on two chains came back with the
+**same attested `requestCID`** from two independent indexers, while `responseCID` and
+`subgraphDeploymentID` differ. One query pattern, several deployments, zero lines changed —
+and the parties attesting to it have no stake in our claim.
+
+`npm run leverage` re-runs it — **with `X402_PRIVATE_KEY` set**, because that measurement is
+made of paid queries ($0.01 each, USDC on Base). Without the key the script runs in
+quote-only mode and says so in its own output: it then proves nothing about the data, since
+a fabricated subgraph id returns the same price challenge. Measured, not assumed.
 
 ⚠️ **Where it runs:** outside the enclave. An enclave has no network, so none of this can
 happen inside one. The claim is "checked before a signature was requested", never "enclave
