@@ -35,113 +35,113 @@ const step = async (n, title) => {
 };
 const say = (...a) => console.log(' ', ...a);
 
-await step(1, 'Агент спрашивает цену. Это бесплатно — 402 ничего не стоит.');
+await step(1, 'The agent asks the price. This is free — reading a 402 costs nothing.');
 const q = await quote();
 if (q.ok) {
-  say(`шлюз просит ${Number(q.amountAtomic) / 1e6} USDC в сети ${q.network}`);
-  say(`способ оплаты: ${q.transferMethod}, токен «${q.tokenDomain.name}» v${q.tokenDomain.version}`);
+  say(`the gateway asks ${Number(q.amountAtomic) / 1e6} USDC on ${q.network}`);
+  say(`payment method: ${q.transferMethod}, token "${q.tokenDomain.name}" v${q.tokenDomain.version}`);
 } else {
-  say('шлюз недоступен:', q.reason);
+  say('gateway unreachable:', q.reason);
 }
 
-await step(2, 'Ответ пришёл с подписью индексатора. Проверяем подпись — по точным байтам.');
+await step(2, 'The answer carries the indexer\u2019s signature. We check it over the EXACT bytes.');
 const body1 = fx('live-2026-09-04.body.json').trim();
 const att1 = parseAttestationHeader(fx('live-2026-09-04.attestation.json'));
 const v1 = await verifyAttestation(body1, att1);
-say('responseCID совпал:', v1.ok);
-say('восстановленный адрес аллокации:', v1.allocationId);
+say('responseCID matched:', v1.ok);
+say('recovered allocation address:', v1.allocationId);
 
-await step(3, 'Кто за этой подписью стоит. Это запрос в цепь — энклав так не может.');
+await step(3, 'Who stands behind that signature. This is an on-chain read — an enclave cannot do it.');
 if (!v1.ok) {
-  // Не идти дальше по несошедшейся подписи: вторичная ошибка резолва заслонила бы
-  // первичную, и на экране была бы названа не та причина.
-  say('шаг пропущен — подпись не сошлась:', v1.reason);
+  // Do not walk on past a signature that did not verify: a secondary resolve error would
+  // mask the primary one, and the screen would name the wrong cause.
+  say('step skipped — signature did not verify:', v1.reason);
 } else {
   try {
-    // 🔴 Идентификатор развёртывания передаётся ОБЯЗАТЕЛЬНО. С `undefined` проверка
-    // «аллокация именно для этого субграфа» в chain.js молча отключается, и кадр
-    // показывал бы индексатора так, будто цепь это подтвердила. Клейм сильнее
-    // выполненного — ровно то, чего мы не делаем, тем более на видео.
+    // 🔴 The deployment id is passed ON PURPOSE. With `undefined`, the check in chain.js
+    // that the allocation belongs to THIS subgraph switches itself off silently, and the
+    // frame would show an indexer as if the chain had confirmed it. A claim stronger than
+    // what was done — exactly what we do not do, least of all on camera.
     const who = await resolveIndexer(v1.allocationId, v1.subgraphDeploymentID, arbitrumClient());
-    say(who.ok ? `индексатор со ставкой: ${who.indexer}` : `не удалось: ${who.reason}`);
-    if (who.ok) say(`и аллокация именно для этого субграфа: ${v1.subgraphDeploymentID.slice(0, 18)}…`);
+    say(who.ok ? `staked indexer: ${who.indexer}` : `could not establish: ${who.reason}`);
+    if (who.ok) say(`and the allocation is for THIS subgraph: ${v1.subgraphDeploymentID.slice(0, 18)}\u2026`);
   } catch (e) {
-    say('не удалось:', String(e?.shortMessage ?? e));
+    say('could not establish:', String(e?.shortMessage ?? e));
   }
 }
 
-await step(4, 'ВТОРОЙ ШАГ, И ОН НЕ СЛЕДУЕТ ИЗ ПЕРВОГО: годятся ли данные.');
+await step(4, 'A SECOND STEP, AND IT DOES NOT FOLLOW FROM THE FIRST: are the data usable?');
 const CHAIN_HEAD = 25904646n;
-const BLOCK_TS_MS = 1788533135 * 1000; // _meta.block.timestamp того же ответа // голова на момент чтения; блок субграфа был 25904639
+const BLOCK_TS_MS = 1788533135 * 1000; // _meta.block.timestamp of that same answer; the chain head at read time, subgraph block was 25904639
 const u1 = checkUsable(JSON.parse(body1), 'ONDO', CHAIN_HEAD);
-say(`живое чтение → ${u1.ok ? 'годен' : 'отказ: ' + u1.reason}`, u1.ok ? `ONDO = ${u1.priceUSD}` : '');
+say(`live read \u2192 ${u1.ok ? 'usable' : 'refused: ' + u1.reason}`, u1.ok ? `ONDO = ${u1.priceUSD}` : '');
 
-// В ТОМ ЖЕ ответе три токена с ценой "0" — не выдуманный случай, а то, что пришло.
+// THE SAME answer carries three tokens priced "0" — not an invented case, what arrived.
 const uZero = checkUsable(JSON.parse(body1), 'TSLAon', CHAIN_HEAD);
-say(`тот же ответ, TSLAon → ОТКАЗ: ${uZero.reason}`);
-say('ноль у хвостового токена законен и для эталона непригоден — отказ, а не «бесплатно».');
+say(`same answer, TSLAon \u2192 REFUSED: ${uZero.reason}`);
+say('zero is legitimate for a long-tail token and useless as a reference — refuse, not "free".');
 
 const body2 = fx('sample2.body.json');
 const v2 = await verifyAttestation(body2, parseAttestationHeader(fx('sample2.attestation.json')));
 const u2 = checkUsable(JSON.parse(body2), 'WETH', CHAIN_HEAD);
-say(`образец 2 → подпись сошлась: ${v2.ok}, а данные: ОТКАЗ — ${u2.reason}`);
-say('это оплаченный, корректно аттестованный ответ С ОШИБКОЙ И БЕЗ ДАННЫХ.');
-say('«подпись сошлась» не значит «цена получена».');
+say(`sample 2 \u2192 signature verified: ${v2.ok}, but the data: REFUSED — ${u2.reason}`);
+say('a paid, correctly attested answer WITH AN ERROR AND NO DATA.');
+say('"the signature verified" does not mean "a price was obtained".');
 
-await step(5, 'Ловушка, которую видно только если мерить ДВА возраста.');
+await step(5, 'A trap you see only if you measure TWO ages.');
 const stale = JSON.parse(body1);
 stale.data.tokens.find((t) => t.symbol === 'ONDO').lastPriceBlockNumber = '25000000';
-say('голова субграфа свежая, а цена записана давно →', checkUsable(stale, 'ONDO', CHAIN_HEAD).reason);
-say('цена пишется в обработчиках событий: мёртвый рынок = мёртвая цена под зелёной индексацией.');
+say('subgraph head fresh, price written long ago \u2192', checkUsable(stale, 'ONDO', CHAIN_HEAD).reason);
+say('prices are written in event handlers: a dead market = a dead price under green indexing.');
 
-await step(6, 'И решение, которое из этого следует.');
+await step(6, 'And the decision that follows from it.');
 {
   const r = buildSnapshot({
     subgraphId: UNISWAP_V3_ETHEREUM, symbol: 'ONDO',
     verification: v1, usability: u1,
     indexer: { ok: true, indexer: '0x4e5c87772C29381bCaBC58C3f182B6633B5a274a' },
     chainHead: CHAIN_HEAD,
-    // Время наблюдения и время блока идут ВМЕСТЕ: снимок отказывается собираться, если
-    // наблюдение заявлено раньше блока, который он описывает. Так и был пойман снимок,
-    // подписанный с датой на год раньше настоящего чтения.
+    // Observation time and block time travel TOGETHER: the snapshot refuses to assemble if
+    // the observation claims to predate the block it describes. That is how a snapshot
+    // signed a year before the actual read was caught.
     blockTimestampMs: BLOCK_TS_MS,
     observedAtMs: BLOCK_TS_MS + 1000,
   });
   if (r.ok) {
-    say(`снимок собран: ${r.bytes} байт, подписывается ДОСЛОВНО`);
-    say(`возраст источника: блок ${r.snapshot.reading.source_block}, цена из ${r.snapshot.reading.price_block}`);
-    say(`полоса ±5%: ${r.snapshot.band.low_usd.slice(0, 12)}… … ${r.snapshot.band.high_usd.slice(0, 12)}…`);
-    say('честная цена  →', judgeOrder(r.snapshot, r.snapshot.reading.price_usd).allowed ? 'РАЗРЕШЕНО' : 'ОТКАЗ');
-    say('цена вдвое    →', judgeOrder(r.snapshot, '0.71').allowed ? 'РАЗРЕШЕНО' : 'ОТКАЗ');
-    say('снимок сам называет, чего мы НЕ проверяли: requestCID и корректность индексатора.');
+    say(`snapshot assembled: ${r.bytes} bytes, signed VERBATIM`);
+    say(`source age: block ${r.snapshot.reading.source_block}, price from ${r.snapshot.reading.price_block}`);
+    say(`band \u00b15%: ${r.snapshot.band.low_usd.slice(0, 12)}\u2026 \u2026 ${r.snapshot.band.high_usd.slice(0, 12)}\u2026`);
+    say('honest price  \u2192', judgeOrder(r.snapshot, r.snapshot.reading.price_usd).allowed ? 'ALLOWED' : 'REFUSED');
+    say('price doubled \u2192', judgeOrder(r.snapshot, '0.71').allowed ? 'ALLOWED' : 'REFUSED');
+    say('the snapshot names what we did NOT check: requestCID, and whether the indexer is right.');
   } else {
-    say(`снимок НЕ собран: ${r.refusal.reason} — и это артефакт, а не молчание`);
+    say(`snapshot NOT assembled: ${r.refusal.reason} — and that is an artifact, not silence`);
   }
 }
 
-await step(7, 'Гейт: агент без человека НЕ ПОЛУЧАЕТ ПОДПИСЬ.');
+await step(7, 'The gate: an agent with no human behind it GETS NO SIGNATURE.');
 {
-  // Отрицательный путь показывается СЕГОДНЯ и без всякой регистрации — в этом его сила.
-  // Ответ настоящий, от обоих реестров AgentBook, а не выдуманный.
+  // The negative path can be shown TODAY, with no registration at all — that is its
+  // strength. The answer is real, from both AgentBook registries, not invented.
   const g = await gateSignatureRequest({
     agentAddress: '0xF25047F2d2CD9d841b3ACf3CA1d38a2a697Ef368',
     observedAtMs: Date.now(),
   });
-  say(`решение: ${g.receipt.decision}`);
-  say(`причина: ${g.reason}`);
-  if (g.receipt.checked_registries) say(`спрошено: ${g.receipt.checked_registries.join(' · ')}`);
+  say(`decision: ${g.receipt.decision}`);
+  say(`reason: ${g.reason}`);
+  if (g.receipt.checked_registries) say(`asked: ${g.receipt.checked_registries.join(' \u00b7 ')}`);
   say('');
-  say('это ИЗМЕНЕНИЕ ПОВЕДЕНИЯ, а не запись в лог: подписи не будет.');
-  say('«человека нет» — не то же, что «спросить не удалось»: у второго своя причина,');
-  say('потому что чинить надо разное — онбординг агента или сломанный узел.');
-  say(`принято: ${g.receipt.decided_by} — до энклава, не внутри него.`);
+  say('this is a CHANGE OF BEHAVIOUR, not a log line: there will be no signature.');
+  say('"no human" is not "could not ask": the second has its own reason,');
+  say('because the fix differs — onboard the agent, or repair a broken node.');
+  say(`decided by: ${g.receipt.decided_by} — before the enclave, not inside it.`);
 }
 
-await step(8, 'Граница, названная вслух.');
-say('всё выше выполняется СНАРУЖИ энклава: у него нет сети.');
-say('аттестация индексатора кладётся в снимок как артефакт для независимой перепроверки,');
-say('а ручается за снимок НАША подпись — и мы отвечаем за то, что цепочку проверили.');
-say('гейт стоит ДО запроса подписи; запроса подписи в этом пакете ещё нет,');
-say('поэтому честно: «подпись не запрашивается», а не «мы охраняем подпись».');
+await step(8, 'The boundary, said out loud.');
+say('everything above runs OUTSIDE the enclave: it has no network.');
+say('the indexer attestation goes into the snapshot as an artifact anyone can re-check,');
+say('but OUR signature is what vouches for the snapshot — and we answer for checking the chain.');
+say('the gate sits BEFORE a signature is requested; this package does not request one yet,');
+say('so the honest wording is "no signature is requested", not "we guard the signature".');
 console.log();
 await dwell();

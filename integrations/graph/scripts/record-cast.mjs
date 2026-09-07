@@ -78,7 +78,7 @@ export function record({ out = 'demo.cast', cols = 100, rows = 34 } = {}) {
         width: cols,
         height: rows,
         timestamp: Math.floor(Date.now() / 1000),
-        title: 'graph-snapshot — производящая половина слоя 3b-1',
+        title: 'Usenami Signer — reading The Graph, verifying the indexer, deciding',
         env: { SHELL: '/bin/zsh', TERM: 'xterm-256color' },
       };
       writeFileSync(out, JSON.stringify(header) + '\n' + events.map((e) => JSON.stringify(e)).join('\n') + '\n');

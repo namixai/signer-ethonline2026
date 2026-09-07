@@ -2,3 +2,9 @@
 # integrations/graph is a Node package; its installed dependencies are not part of the
 # submission and must never be committed.
 integrations/graph/node_modules/
+
+# The rendered reel is an upload artifact, not source. It is rebuilt from the casts:
+#   python3 demo/reel/cast-to-mp4.py out.mp4 a.cast:6 b.cast:20 c.cast:20
+*.mp4
+__pycache__/
+*.pyc
