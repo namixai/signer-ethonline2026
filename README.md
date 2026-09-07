@@ -37,12 +37,15 @@ the venue would accept anything it signed. After that approval no human approved
 and no human touched the key.
 
 **What that is not.** Our own account and our own money, so nobody has trusted us with
-theirs yet. No external audit. Order signing has run on three venues, not the same kind of
-proof on each: Binance Futures since 27 July and Hyperliquid since 16 August both have a
-completed round trip — entry filled, position closed. OKX, since 18 August, has a signed
-order accepted into the book and cancelled — not a completed trade. That is the whole list,
-and the three are not interchangeable in a sentence. First only in the sense of our own
-first; the rules we hold ourselves to are in `CONTINUITY.md`, and one of them forbids the
+theirs yet. No external audit. Order signing has run on three venues since — Binance
+Futures 27 July, Hyperliquid 16 August, OKX 18 August — and the proof is not the same kind
+on each: Binance and Hyperliquid both have a completed round trip, entry filled and
+position closed (Binance 27 July, Hyperliquid **19 August** — three days after the venue
+went live, not the same day; the 16 August Hyperliquid event was a cap-probe and cancel
+that never filled, see `CONTINUITY.md`). OKX has a signed order accepted into the book and
+cancelled — not a completed trade. That is the whole list, and the three are not
+interchangeable in a sentence. First only in the sense of our own first; the rules we hold
+ourselves to are in `CONTINUITY.md`, and one of them forbids the
 other reading.
 
 Nothing here is renamed or backdated. The Continuity track allows pre-existing work;
