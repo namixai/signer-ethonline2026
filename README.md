@@ -83,7 +83,7 @@ reader to discover the gap.
 (2026-09-02..05). Node, no build step:
 
 ```bash
-cd integrations/graph && npm ci && npm test    # 140 tests
+cd integrations/graph && npm ci && npm test    # the run prints the count
 npm run demo                                    # the whole walkthrough, ~2.6 min
 ```
 

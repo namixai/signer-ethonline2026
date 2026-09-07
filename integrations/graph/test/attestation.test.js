@@ -238,7 +238,12 @@ test('🔴 the body is hashed as TEXT, not guessed at — toBytes decodes hex-lo
   const body = '0x1234';
   const viaText = keccak256(stringToBytes(body));
   const r = await verifyAttestation(body, { ...att('sample1.attestation.json'), responseCID: viaText });
-  assert.notEqual(r.reason, 'response_cid_mismatch', 'тело-строка обязано хешироваться как текст');
+  // 🔴 Утверждать УСПЕХ, а не отсутствие одной ошибки. Прежняя версия проверяла
+  // `reason !== 'response_cid_mismatch'` — и прошла бы при отказе по любой ДРУГОЙ причине,
+  // то есть по причине, не имеющей отношения к тому, что тест утверждает. Ровно тот класс,
+  // за которым я гоняюсь в чужом коде.
+  assert.equal(r.ok, true, `ожидался успех, получено: ${r.reason}`);
+  assert.equal(r.responseCID, viaText, 'хеш посчитан по тексту, а не по декодированному hex');
 });
 
 test('🔴 a null field in the attestation header is refused, not passed down', () => {
