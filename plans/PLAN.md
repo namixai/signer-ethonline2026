@@ -41,20 +41,35 @@ and a weakened check must fail its own test.
 
 The same, with a nested structure. A nested struct enters as its own hash — that is an
 EIP-712 rule, not our invention. Policy: amount ceiling, short lifetime, allowed spender
-only. The demonstrable point of the track: the enclave cannot sign an unlimited approval.
+only. The demonstrable point of the track, as planned: the enclave refuses to sign an
+unlimited approval.
 
 ⚠️ Scoped precisely, per `specs/SPEC-permit2-signature-transfer.md`: that guarantee is
 about **AllowanceTransfer**. `SignatureTransfer` has no such value to refuse.
 
 Acceptance: the signature is accepted by Permit2 on a test network.
 
+🔴 **Status as actually built, so this plan and the shipped code agree:** digest
+construction and verification were written and match this plan's scope — see
+`integrations/graph/src/permit2.js` and `FEEDBACK.md`. The policy step described above and
+the signing itself were not built this window: no Permit2-aware code runs in the enclave or
+gateway today, and Permit2 signing needs an enclave action that does not exist yet. The
+demonstrable point stayed a plan, not a result.
+
 ### Phase 3 — 0G
 
-Not "we deployed a contract in their network" — a project that ports by changing an RPC
+🔴 **Cut, not built — and not a scope choice on our side.** 0G disappeared from ETHOnline's
+own public prize roster on 28 August 2026; the individual prize page is still reachable, the
+general prize list no longer carries it. We were planning to build against a track that
+stopped being listed, and did not substitute a different 0G integration. The plan below is
+kept as written, dated, rather than deleted, per the same rule the rest of this submission
+holds to.
+
+~~Not "we deployed a contract in their network" — a project that ports by changing an RPC
 URL exists without them by definition, and their own criterion says so. The angle is their
 mechanism: a provider key born inside a TEE, with attestation binding hardware to that key.
 That is the same trust model as ours, on the other half of the loop. **0G decides what to
-do; Signer decides whether to sign it.**
+do; Signer decides whether to sign it.**~~
 
 ### Phase 3b — The Graph
 
@@ -62,6 +77,22 @@ A subgraph over the attestation registry's events, plus an agent layer that **as
 before deciding: "which code measurement is active right now?". A passive subgraph is not
 enough and we are not pretending otherwise — the data has to be load-bearing for a
 decision.
+
+**Built, not just planned** — see `integrations/graph/`: a signed market-reference
+snapshot plus the rule that refuses an order priced outside a band computed from it. The
+angle that shipped is a price reading, not the registry-events subgraph sketched above —
+we do not have a record of why it moved and are not guessing at one here.
+`CONTINUITY.md` has the full account, including what the claim as first written
+overreached on.
+
+### Phase 3c — World ID (not on this plan when written, added after it shipped)
+
+Our own slot, not in the phases planned above — added here because a plan that goes silent
+on real, shipped work is as misleading as one that promises work never done. A gate:
+before a signature is requested, check two on-chain registries for a human behind the
+calling agent, and refuse to ask if none is found. World ID is the identity primitive that
+registry check is built against. Status and the exact claim boundary — including what has
+*not* been observed live — are in `CONTINUITY.md`.
 
 ### Phase 4 — demo
 
