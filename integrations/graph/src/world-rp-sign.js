@@ -21,6 +21,15 @@
 import { keccak256, toHex, concatBytes, hexToBytes } from 'viem';
 import { sign, serializeSignature } from 'viem/accounts';
 
+// The order of the secp256k1 group. Hardcoded because viem does not export it, and reaching
+// into @noble past viem would mean depending on the internals of a transitive dependency —
+// a bump of viem could move it without a word. This is a constant of the curve rather than
+// a version of anything, but a constant nobody checks is a guess, so the suite pins it by
+// behaviour instead of by restating it: n-1 has to sign and n has to be refused, asserted
+// against the real signing library.
+const SECP256K1_ORDER =
+  0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+
 /**
  * keccak256, then shift right by 8 bits.
  *
@@ -77,6 +86,18 @@ export async function signRequest({
     return { ok: false, reason: 'bad_signing_key' };
   }
   const key = signingKeyHex.startsWith('0x') ? signingKeyHex : `0x${signingKeyHex}`;
+
+  // 🔴 THE SHAPE IS NOT THE RANGE. Sixty-four hex characters describe 2^256 values, and only
+  // the ones from 1 to n-1 are private keys; zero and everything from the group order up are
+  // not. Without this check such a key passes the regex above and reaches viem's `sign`,
+  // which throws — and THE THROW CARRIES THE KEY. The curve library names the rejected
+  // scalar in its message, so a mistyped key lands in stderr, and from there in a CI log or
+  // a pasted bug report, in decimal. This module has one rule, that the key never appears
+  // anywhere, and the error path was the one place breaking it.
+  const scalar = BigInt(key);
+  if (scalar === 0n || scalar >= SECP256K1_ORDER) {
+    return { ok: false, reason: 'bad_signing_key' };
+  }
 
   const nonce = hashToField(random());
   const createdAt = now();

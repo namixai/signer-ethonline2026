@@ -89,3 +89,44 @@ test('the signature is 65 bytes and carries a recovery byte of 27 or 28', async 
   assert.ok(['1b', '1c'].includes(r.sig.slice(-2)), `v = ${r.sig.slice(-2)}`);
   assert.ok(r.expiresAt - r.createdAt === 300);
 });
+
+// Шестьдесят четыре hex-символа это форма, а не диапазон. Ключами кривой являются только
+// значения от 1 до n-1: ноль и всё, что от порядка группы и выше, — не ключи. Без проверки
+// такой ключ доходит до viem, где подписывание бросает, а сообщение об ошибке несёт сам
+// ключ — в десятичном виде, в stderr, оттуда в лог CI или в пересланный багрепорт.
+const CURVE_ORDER =
+  0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+const asKey = (n) => `0x${n.toString(16).padStart(64, '0')}`;
+
+test('a key outside the curve range refuses by name instead of throwing', async () => {
+  const outside = [
+    ['ноль', asKey(0n)],
+    ['ровно порядок группы', asKey(CURVE_ORDER)],
+    ['на единицу выше', asKey(CURVE_ORDER + 1n)],
+    ['все единицы', `0x${'f'.repeat(64)}`],
+  ];
+  for (const [name, k] of outside) {
+    // Не try/catch: брошенное исключение обязано провалить тест, а не быть поймано им.
+    // Пойманное исключение и есть тот самый отказ, которого мы добиваемся, только без
+    // имени и с ключом внутри.
+    const r = await signRequest({ signingKeyHex: k, action: 'x' });
+    assert.equal(r.ok, false, `принят ключ вне диапазона: ${name}`);
+    assert.equal(r.reason, 'bad_signing_key', name);
+    assert.equal(r.sig, undefined, name);
+  }
+});
+
+// 🔴 Эта пара — весь смысл предыдущего теста. Порядок группы прописан у нас literal'ом, и
+// literal, который никто не сверяет, — догадка. Сверять его копией того же числа бессмысленно:
+// обе стороны разделят одну ошибку и тест будет зелёным. Поэтому граница пришпилена
+// поведением, а оракул — настоящая библиотека подписи.
+//
+//   константа занижена  → n-1 будет отвергнут нашей проверкой  → красный здесь;
+//   константа завышена  → ровно n дойдёт до viem и бросит       → красный в тесте выше.
+//
+// Двусторонне: мимо этой пары неверная константа не проходит.
+test('the boundary is the library\'s own, not our arithmetic about it', async () => {
+  const last = await signRequest({ signingKeyHex: asKey(CURVE_ORDER - 1n), action: 'x' });
+  assert.equal(last.ok, true, 'n-1 — валидный ключ, а мы его отвергли: константа занижена');
+  assert.equal(last.sig.length, 2 + 130);
+});
