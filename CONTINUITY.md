@@ -132,11 +132,12 @@ refused, a poll that ran out of time. Collapsing the third into `not_verified` w
 broken network as a human failing to prove they are one.
 
 What none of this shows: World has never returned a "verified" response to us, and will not
-until a real proof arrives from a Sandbox App. Access has since been granted and the app is
-installed on our side; what is left is a person with a phone, not code. What we have seen is
-narrower: a request built against our RP, carrying our signature, accepted by their bridge,
-and a deliberately invalid proof refused by name. **A sandbox-verified request path is not the same claim as being
-registered in AgentBook, and this document does not conflate the two.**
+until a real proof arrives from a Sandbox App. What is missing is a person and a phone, not
+code. Where we stand with that app is not something a reader could check, so this page makes
+no claim about it either way. What we have seen is narrower: a request built against our RP,
+carrying our signature, accepted by their bridge, and a deliberately invalid proof refused
+by name. **A sandbox-verified request path is not the same claim as being registered in
+AgentBook, and this document does not conflate the two.**
 
 ## Public spec artefacts (the set is kept from day one)
 
