@@ -193,24 +193,68 @@ line number in prose drifts the moment someone adds an import.
 
 | what | where |
 |---|---|
-| the three-field domain separator — no `version`, and that is the whole trap | [`permit2.js#L32`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L32) |
-| `PermitDetails` struct hash | [`permit2.js#L42`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L42) |
-| `PermitSingle` struct hash, nested struct as its own hash | [`permit2.js#L52`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L52) |
-| the EIP-712 digest itself | [`permit2.js#L61`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L61) |
-| the policy check that refuses an unlimited approval | [`permit2.js#L77`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L77) |
+| the three-field domain separator — no `version`, and that is the whole trap | [`permit2.js#L32`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/permit2.js#L32) |
+| `PermitDetails` struct hash | [`permit2.js#L42`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/permit2.js#L42) |
+| `PermitSingle` struct hash, nested struct as its own hash | [`permit2.js#L52`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/permit2.js#L52) |
+| the EIP-712 digest itself | [`permit2.js#L61`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/permit2.js#L61) |
+| the policy check that refuses an unlimited approval | [`permit2.js#L77`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/permit2.js#L77) |
 
 **The two independent verifications**, which is the part worth running:
-[`vectors/permit2_ref.py#L114`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/permit2_ref.py#L114)
+[`vectors/permit2_ref.py#L114`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/vectors/permit2_ref.py#L114)
 is path A, hand-written EIP-712 with only keccak borrowed;
-[`vectors/verify_sdk.mjs`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/verify_sdk.mjs)
+[`vectors/verify_sdk.mjs`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/vectors/verify_sdk.mjs)
 is path B, running Uniswap's own `@uniswap/permit2-sdk` with its own type definitions; and
-[`vectors/onchain_fieldorder.mjs`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/onchain_fieldorder.mjs)
+[`vectors/onchain_fieldorder.mjs`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/vectors/onchain_fieldorder.mjs)
 hands the question to the deployed contract, which recovers a signer from *its* digest and
 compares.
 
 🔴 **What this is not.** It builds and checks a digest. There is no Permit2 signing inside
 the enclave — that needs an action which does not exist yet, and writing otherwise would be
 a false claim in a public submission.
+
+### World ID, by file and line
+
+Two halves, and they reached this repository separately. The receiving half, checking a
+proof that comes back, was written on 7 September and moved in on the 8th, so it lands here
+in one commit rather than the one it was written in. Same caveat as `integrations/graph/`
+above, same reason for saying it. The asking half, which signs the request that makes a proof
+happen at all, was written on 8 September. Until then we could check a proof and had no way
+to get one: a listener with nobody speaking.
+
+**The code**, pinned to a commit:
+
+| what | where |
+|---|---|
+| `hash_to_field` — keccak256 shifted right by eight bits, which is what turns a hash into a field element | [`world-rp-sign.js#L42`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/world-rp-sign.js#L42) |
+| the message the relying party signs — 49 bytes without an action, 81 with one | [`world-rp-sign.js#L62`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/world-rp-sign.js#L62) |
+| the EIP-191 prefix, whose length is counted in **bytes** and written in decimal | [`world-rp-sign.js#L122`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/world-rp-sign.js#L122) |
+| checking a returned proof against World ID 4.0 | [`world-verify.js#L166`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/world-verify.js#L166) |
+| the AgentBook lookup, and the three answers it keeps apart | [`world.js#L110`](https://github.com/namixai/signer-ethonline2026/blob/df9c774/integrations/graph/src/world.js#L110) |
+
+The signing scheme is built from World's specification rather than lifted from their SDK, so
+the whole path is ours to answer for, and their published vectors are asserted in the suite.
+An implementation of a signature scheme that has never reproduced a known value is a guess
+with good intentions. It also agrees with their SDK's own `signRequest` on our action:
+two implementations that share no code, arriving at the same bytes.
+
+**Running it end to end** needs a phone with the World ID Sandbox App:
+
+```bash
+cd integrations/graph && npm run world:proof
+```
+
+It signs a request, prints a QR code, waits, and then says one of three things. Two of them
+are World's answers: `verified` and `not_verified`. The third, `could_not_ask`, covers every
+case where the question never reached a person at all: no signing key, a request the bridge
+refused, a poll that ran out of time. Folding that third outcome into `not_verified` would
+report a network problem as a human failing to prove they are one.
+
+🔴 **What we have not seen.** World has never answered `verified` to us. What we have seen
+is narrower: a request built against our relying party, carrying our signature, accepted by
+their bridge, and a deliberately invalid proof refused by name. The positive path needs a
+real proof from a real phone. Until one arrives, this page says nothing more than that. And
+none of it is the same claim as being registered in AgentBook — that needs an Orb, and we do
+not have one.
 
 ## Verify the product itself, not just this repo
 

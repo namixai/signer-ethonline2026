@@ -50,7 +50,7 @@ without it the integrations written in the window would be guesswork.
 | **2026-08-16** | **the enclave signed an order Hyperliquid accepted, and the cancel was accepted**; the same policy signed 0.010 BNB under the cap and refused 0.050 | product milestone, not hackathon work — the signing path predates the event |
 | **2026-08-15** | **position-NFT permit vectors** — two paths, every domain separator anchored against the deployed contract, and a falsification set; counts likewise live in the run, not here — `verify_nft_ours.py` and `falsify_nft.py` | bench (`vectors/`), does not ship as submission code |
 
-## What has been written IN THE WINDOW (from 4 September) — status as of 7 September
+## What has been written IN THE WINDOW (from 4 September) — status as of 8 September
 
 The 16 August plan and the actual window diverged. Two items on that plan were cut, one
 shipped in a different, narrower shape than written, and three integrations happened that
@@ -109,11 +109,34 @@ staging, and the `agent-signature-gate` action is configured in both. A live pro
 deliberately wrong RP against a correct request body returns a different error
 (`app_not_migrated`) than the same probe with our real RP (`verification_error`, meaning the
 request reached proof checking) — that contrast is what proves the identifier is live and
-recognized, not a claim taken on faith. What this does not show: World has never returned a
-"verified" response to us, and won't until a real proof arrives from a Sandbox App — our
-application for World ID Sandbox access is still pending on their side. **A sandbox-verified
-request path is not the same claim as being registered in AgentBook, and this document does
-not conflate the two.**
+recognized, not a claim taken on faith.
+
+On 8 September the half that asks was written, and the half that answers finally moved in.
+Until then `world-verify.js` could check a proof and nothing in the repository could get one
+— a listener with nobody speaking.
+
+`src/world-rp-sign.js` signs the request World requires from a relying party, built from
+their specification rather than lifted from their SDK. Their published vectors are asserted
+in the suite, and the result agrees with their own `signRequest` on our action — two
+implementations sharing no code and landing on the same bytes. Written 8 September.
+
+`src/world-verify.js` and its tests were written on 7 September and until the 8th lived only
+in the working tree, never in this repository. A reader could see the AgentBook resolver and
+not the code that checks a World proof, the half the track is about. A repository whose
+history is thinner than the work has to explain itself before someone else does.
+
+`scripts/world-proof.mjs` runs the whole path — `npm run world:proof` — and reports one of
+three outcomes, never two. `verified` and `not_verified` are World's answers. `could_not_ask`
+is every case where the question never reached a person: no signing key, a request the bridge
+refused, a poll that ran out of time. Collapsing the third into `not_verified` would report a
+broken network as a human failing to prove they are one.
+
+What none of this shows: World has never returned a "verified" response to us, and will not
+until a real proof arrives from a Sandbox App. Access has since been granted and the app is
+installed on our side; what is left is a person with a phone, not code. What we have seen is
+narrower: a request built against our RP, carrying our signature, accepted by their bridge,
+and a deliberately invalid proof refused by name. **A sandbox-verified request path is not the same claim as being
+registered in AgentBook, and this document does not conflate the two.**
 
 ## Public spec artefacts (the set is kept from day one)
 
