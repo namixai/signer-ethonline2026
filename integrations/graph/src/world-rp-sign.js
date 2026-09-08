@@ -27,6 +27,13 @@ import { sign, serializeSignature } from 'viem/accounts';
 // a version of anything, but a constant nobody checks is a guess, so the suite pins it by
 // behaviour instead of by restating it: n-1 has to sign and n has to be refused, asserted
 // against the real signing library.
+// A request is a bearer artifact until it expires: anyone holding it can present it. An
+// hour is far past anything a person scanning a QR needs, and short enough that a leaked
+// request is not a standing key. The floor is one second because a request that is already
+// expired is not a request.
+const MIN_TTL_SECONDS = 1;
+const MAX_TTL_SECONDS = 3600;
+
 const SECP256K1_ORDER =
   0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
@@ -80,6 +87,23 @@ export async function signRequest({
   now = () => Math.floor(Date.now() / 1000),
   random = () => crypto.getRandomValues(new Uint8Array(32)),
 } = {}) {
+  // 🔴 An action of the wrong TYPE signs perfectly well and commits to the wrong thing.
+  // Measured: `{}`, `42`, `['a']` and `true` each produced a valid 81-byte signed message,
+  // because the action reaches a TextEncoder that stringifies whatever it is given —
+  // "[object Object]", "42", "a", "true". World then checks a commitment to an action we
+  // never meant, and the failure surfaces as a verification error with nothing wrong in it.
+  if (action !== null && action !== undefined && typeof action !== 'string') {
+    return { ok: false, reason: 'bad_action' };
+  }
+
+  // 🔴 The lifetime is a bound on how long a signed request stays usable by whoever holds
+  // it. Unchecked it took anything: `ttl: -100` signed a request that expired a hundred
+  // seconds before it was created, `0` one that expired on creation, `1e9` one good for
+  // thirty-one years, and `NaN` threw out of BigInt instead of refusing by name.
+  if (!Number.isSafeInteger(ttl) || ttl < MIN_TTL_SECONDS || ttl > MAX_TTL_SECONDS) {
+    return { ok: false, reason: 'bad_ttl' };
+  }
+
   if (typeof signingKeyHex !== 'string' || !/^(0x)?[0-9a-fA-F]{64}$/.test(signingKeyHex)) {
     // A named refusal, because a malformed key must fail here and not halfway through a
     // request World will reject for reasons that look like ours.

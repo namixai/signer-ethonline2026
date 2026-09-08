@@ -130,3 +130,50 @@ test('the boundary is the library\'s own, not our arithmetic about it', async ()
   assert.equal(last.ok, true, 'n-1 — валидный ключ, а мы его отвергли: константа занижена');
   assert.equal(last.sig.length, 2 + 130);
 });
+
+// Тип действия и границы времени жизни.
+//
+// Замер до правки: action = {} / 42 / ['a'] / true подписывались как совершенно валидное
+// сообщение в 81 байт, потому что действие доезжает до TextEncoder, который приводит к
+// строке что угодно — "[object Object]", "42", "a", "true". Подпись хорошая, обязательство
+// не то, и наружу это выходит ошибкой проверки, в которой ничего не сломано.
+test('an action that is not a string refuses instead of signing something else', async () => {
+  for (const action of [{}, 42, ['a'], true, Symbol.iterator]) {
+    const r = await signRequest({ signingKeyHex: DOC_KEY, action });
+    assert.equal(r.ok, false, `подписано действие типа ${typeof action}`);
+    assert.equal(r.reason, 'bad_action');
+    assert.equal(r.sig, undefined);
+  }
+});
+
+test('a string action and no action both still sign', async () => {
+  for (const action of ['agent-signature-gate', null, undefined]) {
+    const r = await signRequest({ signingKeyHex: DOC_KEY, action });
+    assert.equal(r.ok, true, `отвергнуто законное действие: ${String(action)}`);
+  }
+  // Длины из спеки: без действия 49 байт, с действием 81. Если проверка типа начнёт
+  // резать законные строки, это увидит следующая строка, а не только флаг ok.
+  assert.equal((await signRequest({ signingKeyHex: DOC_KEY, action: null })).messageBytes, 49);
+  assert.equal((await signRequest({ signingKeyHex: DOC_KEY, action: 'x' })).messageBytes, 81);
+});
+
+// Подписанный запрос — предъявительский до истечения: кто его держит, тот и предъявляет.
+// Замер до правки: -100 подписывал запрос, истёкший за сто секунд ДО создания; 0 — истёкший
+// в момент создания; 1e9 — годный тридцать один год; NaN не отказывал, а падал из BigInt.
+test('the lifetime is bounded at both ends, and a bad one refuses by name', async () => {
+  for (const ttl of [-100, 0, 3601, 10 ** 9, NaN, Infinity, 1.5, '300', null]) {
+    const r = await signRequest({ signingKeyHex: DOC_KEY, action: 'x', ttl });
+    assert.equal(r.ok, false, `принято время жизни ${String(ttl)}`);
+    assert.equal(r.reason, 'bad_ttl', `ttl=${String(ttl)}`);
+  }
+});
+
+// 🔴 Границы обязаны пропускать то, что внутри, иначе предыдущий тест зелёный при
+// проверке «отвергать всё», и подписывать станет нечем.
+test('the ends of the allowed range still sign, and the window is what was asked', async () => {
+  for (const ttl of [1, 300, 3600]) {
+    const r = await signRequest({ signingKeyHex: DOC_KEY, action: 'x', ttl });
+    assert.equal(r.ok, true, `отвергнуто законное время жизни ${ttl}`);
+    assert.equal(r.expiresAt - r.createdAt, ttl);
+  }
+});

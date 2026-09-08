@@ -228,10 +228,26 @@ export async function verifyWorldIdProofV4({
 
   // Their per-result `code` is more specific than the envelope, so prefer it when present.
   const firstResultCode = Array.isArray(parsed?.results) ? parsed.results.find((r) => r?.code)?.code : undefined;
+  const worldCode = firstResultCode ?? parsed?.code;
+
+  // 🔴 A VERDICT IS SOMETHING WORLD SAID, not a status code we were handed. The 5xx/429
+  // guard above named two failures that are obviously theirs; it left every other one.
+  // Measured before this check existed: 401, 403, 451, 301 and 404 all came back as
+  // `not_verified` with `http_401` and friends in the reason — a revoked key, a
+  // geoblock or a moved endpoint reported as a person failing to prove they are human.
+  //
+  // The rule is not a longer list of statuses, because that list has no end. It is the
+  // question the list was standing in for: on a non-2xx, did World actually answer? A
+  // code of theirs means yes, they looked and refused. No code means the request did not
+  // reach a verdict, and saying otherwise invents one.
+  if (!res.ok && worldCode === undefined) {
+    return { ok: false, reason: 'verify_no_verdict', detail: `status ${res.status}` };
+  }
+
   return {
     ok: true,
     verified: false,
-    reason: firstResultCode ?? parsed?.code ?? `http_${res.status}`,
+    reason: worldCode ?? `http_${res.status}`,
     detail: parsed?.detail ?? parsed?.message ?? null,
     status: res.status,
   };

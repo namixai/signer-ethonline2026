@@ -18,27 +18,23 @@
 // own docs say to rotate it if it leaks, and the portal does not keep a copy: there is no
 // second one.
 
-import { readFile } from 'node:fs/promises';
 import qrcode from 'qrcode-terminal';
+import { installIdkitWasmShim } from '../src/idkit-wasm-shim.js';
 import { signRequest } from '../src/world-rp-sign.js';
 import { verifyWorldIdProofV4 } from '../src/world-verify.js';
 
-// 🔴 IDKit ships its WASM next to itself and loads it with
-// `fetch(new URL("idkit_wasm_bg.wasm", import.meta.url))`. In a browser that is an HTTP
-// URL; under Node it is `file:`, and Node's fetch answers "not implemented... yet...".
-// Measured on Node v26: the file is right there on disk and the fetch fails anyway.
+// IDKit loads its WASM with a `file:` URL under Node, which Node's fetch refuses. The shim
+// that fixes it serves exactly one path and is taken back down as soon as IDKit is done
+// with it — see src/idkit-wasm-shim.js for why both halves of that matter.
 //
-// So this serves file: URLs from disk and leaves every other request alone. It is a shim
-// around a browser assumption, not a workaround for something being wrong with IDKit —
-// and it is installed BEFORE the dynamic import below, because the wasm loads on import.
-const nodeFetch = globalThis.fetch;
-globalThis.fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : input?.url ?? String(input);
-  if (url.startsWith('file:')) return new Response(await readFile(new URL(url)));
-  return nodeFetch(input, init);
-};
-
-const { IDKit, orbLegacy, proofOfHuman, deviceLegacy, IDKitErrorCodes } = await import('@worldcoin/idkit-core');
+// 🔴 IT COMES DOWN AFTER THE POLL, NOT AFTER THE IMPORT. The comment that used to sit here
+// said the wasm loads on import; it does not. Restoring `fetch` right after the import
+// produced `Failed to initialize IDKit WASM: TypeError: fetch failed` from inside
+// `IDKit.request`, which is where the module actually reaches for it. The old shim was
+// never uninstalled at all, so nothing could disagree with the comment.
+const shim = installIdkitWasmShim();
+const { IDKit, orbLegacy, proofOfHuman, deviceLegacy, IDKitErrorCodes } =
+  await import('@worldcoin/idkit-core');
 
 const APP_ID = process.env.WORLD_APP_ID ?? 'app_5f3eda09fb0da78389932c5c2d262282';
 const RP_ID = process.env.WORLD_RP_ID ?? 'rp_1509b9b6909048a4';
@@ -50,11 +46,24 @@ const ACTION = process.env.WORLD_ACTION ?? 'agent-signature-gate';
 // Sandbox App and the request goes somewhere nobody is listening.
 const ENVIRONMENT = process.env.WORLD_ENV ?? 'sandbox';
 
+// 🔴 Legacy proofs change WHAT counts as an acceptable proof, so an answer recorded
+// without this flag cannot be reproduced: the same request with it off may be refused.
+// One constant feeds both the request and the artifact — two literals would drift.
+const ALLOW_LEGACY_PROOFS = process.env.WORLD_ALLOW_LEGACY !== '0';
+
 const PRESETS = { 'proof-of-human': proofOfHuman, 'orb-legacy': orbLegacy, 'device-legacy': deviceLegacy };
 const presetName = process.env.WORLD_PRESET ?? 'proof-of-human';
 const TIMEOUT_MS = Number(process.env.WORLD_TIMEOUT_MS ?? 180_000);
 
 const out = (o) => { console.log(JSON.stringify(o, null, 2)); return o; };
+
+// Everything that decides what World was actually asked. A recorded "verified" without the
+// preset and the legacy flag names an outcome nobody can reproduce: those two change which
+// proofs are acceptable, so the same rp_id and action can answer differently under each.
+const requestShape = () => ({
+  rp_id: RP_ID, action: ACTION, environment: ENVIRONMENT,
+  preset: presetName, allow_legacy_proofs: ALLOW_LEGACY_PROOFS,
+});
 
 const key = process.env.WORLD_ID_SIGNER_PRIVATE_KEY;
 if (!key) {
@@ -81,7 +90,7 @@ try {
     app_id: APP_ID,
     action: ACTION,
     environment: ENVIRONMENT,
-    allow_legacy_proofs: true,
+    allow_legacy_proofs: ALLOW_LEGACY_PROOFS,
     rp_context: {
       rp_id: RP_ID,
       nonce: signed.nonce,
@@ -112,6 +121,9 @@ try {
   process.exit(2);
 }
 
+// IDKit has everything it needs from disk by now; verification talks to the network.
+shim.restore();
+
 if (!completion?.success) {
   // Cancelled and timed out are NOT rejections. Nobody said no; nobody said anything.
   const reason = completion?.error === IDKitErrorCodes.Timeout ? 'timeout'
@@ -135,9 +147,9 @@ if (r.ok === false) {
 }
 if (r.verified) {
   // The artifact worth keeping: this is the first time World has answered "yes" to us.
-  out({ outcome: 'verified', rp_id: RP_ID, action: ACTION, environment: ENVIRONMENT,
+  out({ outcome: 'verified', ...requestShape(),
         nullifier: r.nullifier, results: r.results, at: new Date().toISOString() });
   process.exit(0);
 }
-out({ outcome: 'not_verified', reason: r.reason, detail: r.detail, status: r.status });
+out({ outcome: 'not_verified', ...requestShape(), reason: r.reason, detail: r.detail, status: r.status });
 process.exit(1);
