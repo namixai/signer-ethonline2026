@@ -250,11 +250,14 @@ refused, a poll that ran out of time. Folding that third outcome into `not_verif
 report a network problem as a human failing to prove they are one.
 
 🔴 **What we have not seen.** World has never answered `verified` to us. What we have seen
-is narrower: a request built against our relying party, carrying our signature, accepted by
-their bridge, and a deliberately invalid proof refused by name. The positive path needs a
-real proof from a real phone. Until one arrives, this page says nothing more than that. And
-none of it is the same claim as being registered in AgentBook — that needs an Orb, and we do
-not have one.
+is one thing: a deliberately invalid proof refused by name at their verifier. Their bridge
+does hand back a live sandbox link for our request, and an earlier draft of this page
+offered that as evidence — it is not. Measured: the bridge returns the same link for a
+request signed with a key that is not ours, and for an `rp_id` we invented. It says the
+endpoint is up, nothing about us. What speaks for the signing is the paragraph above: their
+own vectors, reproduced. The positive path needs a real proof from a real phone. And none of
+this is the same claim as being registered in AgentBook — that needs an Orb, and we do not
+have one.
 
 ## Verify the product itself, not just this repo
 

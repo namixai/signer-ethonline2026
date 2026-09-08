@@ -134,9 +134,12 @@ broken network as a human failing to prove they are one.
 What none of this shows: World has never returned a "verified" response to us, and will not
 until a real proof arrives from a Sandbox App. What is missing is a person and a phone, not
 code. Where we stand with that app is not something a reader could check, so this page makes
-no claim about it either way. What we have seen is narrower: a request built against our RP,
-carrying our signature, accepted by their bridge, and a deliberately invalid proof refused
-by name. **A sandbox-verified request path is not the same claim as being registered in
+no claim about it either way. What we have seen is one thing: a deliberately invalid proof
+refused by name at their verifier. Their bridge does return a live sandbox link for our
+request, and this page used to offer that as evidence — measurement says otherwise. The same
+link comes back for a request signed with a key that is not ours, and for an rp_id we
+invented, so it reports the endpoint is up and nothing about us. The signing is vouched for
+by the reproduced vectors above, not by the bridge. **A sandbox-verified request path is not the same claim as being registered in
 AgentBook, and this document does not conflate the two.**
 
 ## Public spec artefacts (the set is kept from day one)
