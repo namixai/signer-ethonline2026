@@ -13,7 +13,13 @@ Signer is one endpoint. An agent brings a ready order from some protocol, an AWS
 enclave checks it against the owner's policy, and either signs it or refuses. We do not
 build a DEX, route trades, or invent a protocol. The demonstration is narrower and
 checkable: the agent's key is physically out of reach, and limits are applied before a
-signature exists — on existing protocols, without modifying them.
+signature exists — for the keys that carry them — on existing protocols, without
+modifying them.
+
+Same two qualifications as the README, and for the same reason: the policy is the owner's
+but we write it out by hand (no self-service yet), and a per-order cap protects only the
+keys it was written for — the keyless testnet token has no size limit, it is bound to the
+withdrawal ban instead.
 
 ## Phases
 

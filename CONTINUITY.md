@@ -25,7 +25,7 @@ Knowledge gathered before the event is not hidden — it is here, dated.
 | **`sign_data`** — data signed by a separate attested key | designed 06.2026, implemented in the main lane | design documents in the repository |
 | **attested-snapshot** — a signed market snapshot | schema contract v2, July 2026 | contract + public verification page |
 | **Policy before signature** — limits applied in the enclave before signing | in production on CEX venues | sources |
-| **A live signing cycle on a real venue** — key generated inside the enclave, attested policy with a cap, an order accepted by the venue and a cancel accepted | 2026-08-16, on Hyperliquid. Same morning, same policy: 0.010 BNB signed under the 0.041 cap, 0.050 refused with `policy_denied`. The accepted order rested and never filled | our own account and our own money; no external audit; two venues, Binance Futures since 27 July and Hyperliquid since 16 August; one human action in the path — the account approved the enclave's address on chain, once |
+| **A live signing cycle on a real venue** — key generated inside the enclave, attested policy with a cap, an order accepted by the venue and a cancel accepted | 2026-08-16, on Hyperliquid. Same morning, same policy: 0.010 BNB signed under the 0.041 cap, 0.050 refused with `policy_denied`. The accepted order rested and never filled | our own account and our own money; no external audit; **three** venues — Binance Futures since 27 July, Hyperliquid since 16 August, OKX since 18 August — and the proof is a different kind on each, which is why they must not be merged into one sentence: Binance and Hyperliquid each have a completed round trip (entry filled, position closed — 27 July and 19 August), while OKX has a signed order accepted into the book and cancelled, never executed; one human action in the path — the account approved the enclave's address on chain, once |
 
 ## What was written in August, BEFORE the window
 
@@ -44,11 +44,11 @@ without it the integrations written in the window would be guesswork.
 | 2026-08-08 | plan for this repository + verifier-page spec | plan and spec |
 | **2026-08-14** | **Permit2 in full** — AllowanceTransfer, SignatureTransfer, both witness variants; domains checked against the deployed contract on Ethereum and Base | knowledge and spec (`specs/`) |
 | **2026-08-14** | **Uniswap execution path** — the swap is not signed; `executeSigned` from the router's `main` branch is not deployed at the live addresses | knowledge and spec (`specs/`) |
-| **2026-08-14** | **Permit2 test vectors** — 11 cases, two independent implementations, an on-chain anchor, six falsification mutations | bench (`vectors/`), does not ship as submission code |
+| **2026-08-14** | **Permit2 test vectors** — two independent implementations, an on-chain anchor, and a falsification set; the counts are not repeated here, because `vectors/README.md` already records what a repeated count did — both prose numbers had silently drifted from the scripts by 2026-09-07. Run `verify_ours.py` and `falsify.py`: each prints what it just read | bench (`vectors/`), does not ship as submission code |
 | **2026-08-14** | this repository created, with the August material imported under its real dates | disclosure, which is the point |
 | **2026-08-15** | **every signature surface in the swap path enumerated** — all 23 router commands classified; three forward a signature and a fourth nests; v3 and v4 position-NFT permits share a type hash and disagree about the domain | knowledge and spec (`specs/`) |
 | **2026-08-16** | **the enclave signed an order Hyperliquid accepted, and the cancel was accepted**; the same policy signed 0.010 BNB under the cap and refused 0.050 | product milestone, not hackathon work — the signing path predates the event |
-| **2026-08-15** | **position-NFT permit vectors** — 7 cases, two paths, every domain separator anchored against the deployed contract, 7 falsification mutations | bench (`vectors/`), does not ship as submission code |
+| **2026-08-15** | **position-NFT permit vectors** — two paths, every domain separator anchored against the deployed contract, and a falsification set; counts likewise live in the run, not here — `verify_nft_ours.py` and `falsify_nft.py` | bench (`vectors/`), does not ship as submission code |
 
 ## What has been written IN THE WINDOW (from 4 September) — status as of 7 September
 
@@ -148,9 +148,11 @@ not conflate the two.**
   Any uniqueness claim survives exactly one search, and takes the credibility of everything
   around it when it goes.
 - **We say what the live run does not cover.** The Hyperliquid cycle of 2026-08-16 ran on
-  our own account with our own money, has had no external audit, covers two venues in total,
-  and required one on-chain approval from the account before the venue would accept anything
-  the enclave signed. Stating the milestone without those qualifications next to it would be
+  our own account with our own money, has had no external audit, and required one on-chain
+  approval from the account before the venue would accept anything the enclave signed. It is
+  also one venue of three, and the other two are not the same kind of evidence — Binance has
+  a completed round trip like Hyperliquid's, OKX has a signature the venue booked and then
+  cancelled, with nothing executed. Stating the milestone without those qualifications next to it would be
   the same overreach as any other unqualified claim.
 - **We do not stitch two runs into one.** The cap probes and the venue-accepted order happened
   in separate runs on the same day; describing them as one continuous unattended cycle would
