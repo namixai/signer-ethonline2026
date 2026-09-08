@@ -224,3 +224,51 @@ test('🔴 LIVE: a MALFORMED body hides the rp completely — this is why the ch
   assert.equal(ours.reason, absent.reason,
     'ловушка исчезла: форма тела больше не маскирует rp — можно упростить живую проверку');
 });
+
+// Транспортный статус — не приговор.
+//
+// Замер до правки: 401, 403, 451, 301 и 404 возвращались как not_verified с reason
+// `http_401` и подобными. Отозванный ключ, геоблок или переехавший адрес докладывались
+// как человек, не прошедший проверку. Гвардия выше называла 5xx и 429 поимённо и
+// оставляла всё остальное.
+//
+// Проверяем не список статусов, а правило, ради которого список существовал: на не-2xx
+// World либо назвал свой код (значит смотрел и отказал), либо не назвал — и тогда
+// приговора нет.
+test('a transport status with no code from World is not a verdict', async () => {
+  const stub = (status, body) => async () =>
+    new Response(body, { status, headers: { 'content-type': 'application/json' } });
+  for (const [status, body] of [
+    [401, '{"error":"unauthorized"}'],
+    [403, '{"error":"forbidden"}'],
+    [451, '{}'],
+    [404, '{}'],
+    [400, '{"error":"bad request"}'],
+  ]) {
+    const r = await verifyWorldIdProofV4({
+      rpId: 'rp_test', action: 'a', nonce: '0x00', responses: [{}], fetchImpl: stub(status, body),
+    });
+    assert.equal(r.ok, false, `статус ${status} прошёл как приговор`);
+    assert.equal(r.reason, 'verify_no_verdict', `статус ${status}`);
+    assert.notEqual(r.verified, false, `статус ${status} доложен как «не прошёл проверку»`);
+  }
+});
+
+// 🔴 Обратная половина того же правила, и без неё первая проверка проходила бы при
+// заглушенном «всё не-2xx это не приговор» — а это уже потеря настоящих отказов World.
+test('a non-2xx that carries a World code IS a verdict and stays one', async () => {
+  const stub = (status, body) => async () =>
+    new Response(body, { status, headers: { 'content-type': 'application/json' } });
+  const cases = [
+    [400, '{"code":"invalid_proof"}', 'invalid_proof'],
+    [400, '{"results":[{"code":"max_verifications_reached"}]}', 'max_verifications_reached'],
+  ];
+  for (const [status, body, expected] of cases) {
+    const r = await verifyWorldIdProofV4({
+      rpId: 'rp_test', action: 'a', nonce: '0x00', responses: [{}], fetchImpl: stub(status, body),
+    });
+    assert.equal(r.ok, true, `${expected}: настоящий отказ World потерян как транспортный`);
+    assert.equal(r.verified, false);
+    assert.equal(r.reason, expected);
+  }
+});
