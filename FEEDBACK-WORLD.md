@@ -106,6 +106,44 @@ narrower door than either page alone suggests.
 
 ---
 
+## 8. Creating a request succeeds no matter what the relying party signs
+
+World ID 4.0 has the relying party sign its request: a nonce, a created-at, an expires-at,
+and the action, under the RP's key. We implemented that from your spec and it reproduces
+your published vectors. Then we ran a control, because a check we have never seen fail is
+not a check.
+
+The control is one line: keep everything the same and sign with a key that is not the RP's.
+The bridge returned a live `https://sandbox.world.org/verify?t=wld&i=…&k=…` link, exactly
+as it does for a correctly signed request. So we pushed further and passed an `rp_id` that
+does not exist at all — `rp_deadbeefdeadbeef`. Same result: a session, a link, a QR a person
+could scan.
+
+Both are reproducible in three minutes against your sandbox with any key.
+
+**Why this is worth your time even if it is deliberate.** We are not claiming the request
+should be authenticated at the bridge; deferring every check to verification may well be the
+design, and from the outside we cannot tell. The cost is in what an implementer concludes.
+Getting the RP signature right is the fiddly part of the integration — the field is a hash
+shifted by eight bits, the message is 49 bytes or 81, and the EIP-191 prefix counts bytes in
+decimal rather than characters. Miss any of those and the bridge still hands you a link, a
+QR still renders, and a person still scans it. The first word you get that anything is wrong
+arrives after a human has already been asked to prove they are one.
+
+It also produces false evidence, and we walked into it ourselves. An earlier draft of our
+own README offered "our request was accepted by their bridge" as part of what we had
+observed. It is not evidence of anything about us; we removed it after running the control
+above. Anyone writing up an integration is liable to make the same inference, and it will
+read as a claim about their signing when it is a claim about your uptime.
+
+**What we would have wanted**, in order of how much it would have helped: a request refused
+at creation when the `rp_context` signature does not verify against the registered key; or,
+failing that, one sentence in the request-creation docs saying that creation performs no RP
+authentication, so acceptance means the endpoint is reachable and nothing more. Either one
+turns a silent hour into an immediate error.
+
+---
+
 ## Sandbox and Orb — geography we hit before we hit code
 
 Orb verification is not something we can reach as a two-person remote team: the official
