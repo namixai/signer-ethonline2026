@@ -11,7 +11,15 @@ One endpoint. An agent brings a ready order from some protocol, an AWS Nitro enc
 checks it against the owner's policy, and either signs it or refuses. We don't build a
 DEX, we don't route trades, we don't invent a protocol. The claim is narrower than that
 and it is checkable: the agent's key is physically out of reach, and limits are applied
-before a signature exists. On existing protocols, without changing them.
+before a signature exists — for the keys that carry them. On existing protocols, without
+changing them.
+
+Two qualifications belong right here rather than in a footnote, because without them the
+paragraph above claims more than the software does. **The policy is the owner's, but we
+are the ones who write it out** — there is no self-service yet, so "set by the owner"
+describes whose rules they are, not who typed them. And **a per-order cap protects only
+the keys it was written for**: the keyless testnet token carries no size limit at all, it
+is bound to the withdrawal ban instead.
 
 ## What was done before 4 September
 
