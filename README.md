@@ -171,6 +171,39 @@ prompts, and for the same reason: a document tidied up after the fact describes 
 instead of recording it. What each one settles is in the table above, in English; the
 reading itself isn't.
 
+### Permit2, by file and line
+
+The Uniswap track asks a README to point at the contracts and the lines of code, so here
+they are rather than a directory to go hunting in. Links are pinned to a commit, because a
+line number in prose drifts the moment someone adds an import.
+
+**The contract** — Permit2, the same address on Ethereum and Base, checked against
+`vectors/addresses.json`:
+[`0x000000000022D473030F116dDEE9F6B43aC78BA3`](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
+
+**The code that builds the digest**, written in the window:
+
+| what | where |
+|---|---|
+| the three-field domain separator — no `version`, and that is the whole trap | [`permit2.js#L32`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L32) |
+| `PermitDetails` struct hash | [`permit2.js#L42`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L42) |
+| `PermitSingle` struct hash, nested struct as its own hash | [`permit2.js#L52`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L52) |
+| the EIP-712 digest itself | [`permit2.js#L61`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L61) |
+| the policy check that refuses an unlimited approval | [`permit2.js#L77`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/integrations/graph/src/permit2.js#L77) |
+
+**The two independent verifications**, which is the part worth running:
+[`vectors/permit2_ref.py#L114`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/permit2_ref.py#L114)
+is path A, hand-written EIP-712 with only keccak borrowed;
+[`vectors/verify_sdk.mjs`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/verify_sdk.mjs)
+is path B, running Uniswap's own `@uniswap/permit2-sdk` with its own type definitions; and
+[`vectors/onchain_fieldorder.mjs`](https://github.com/namixai/signer-ethonline2026/blob/8ce69ef/vectors/onchain_fieldorder.mjs)
+hands the question to the deployed contract, which recovers a signer from *its* digest and
+compares.
+
+🔴 **What this is not.** It builds and checks a digest. There is no Permit2 signing inside
+the enclave — that needs an action which does not exist yet, and writing otherwise would be
+a false claim in a public submission.
+
 ## Verify the product itself, not just this repo
 
 The interesting claim is not in this repository. It is that you can rebuild the enclave
