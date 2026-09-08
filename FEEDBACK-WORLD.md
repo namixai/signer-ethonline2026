@@ -71,6 +71,41 @@ one.
 
 ---
 
+## 5. The Developer Portal blocks by the browser's exit IP, not by country
+
+One browser on our team got a flat Cloudflare block on `developer.world.org`. Before
+treating it as a country-level restriction — a much bigger problem — we checked: same
+machine, same country, same edge, but a request from the command line instead of the
+browser came back 200. The block was tracking that browser's exit IP, nothing broader. We
+went through the Developer Portal MCP instead, which the block never touched.
+
+**What would help.** Whatever fires on this block naming the actual signal. IP reputation
+and geography are different problems, and we burned time on the wrong one first.
+
+## 6. Sandbox access runs through an Apple review queue with no visible ETA
+
+Testing an actual accept response needs the World ID Sandbox App, which ships through
+TestFlight. Our install request has been sitting in `pending` review since we applied,
+with nothing on our side beyond that one word.
+
+**What would help.** App Store review isn't World's to speed up, but it's the one piece of
+this integration neither we nor World can move. A known-ETA note, or a web-based sandbox
+path, would help anyone racing a hackathon deadline against it.
+
+## 7. AgentBook needs Orb, not Selfie Check — and we didn't find that written anywhere
+
+Going in, we assumed any World ID credential level might register an agent in AgentBook —
+the AgentKit and Selfie Check prize pages sit side by side and neither rules the other out.
+World's own team corrected us directly, at the 4 September workshop: AgentBook registration
+is Orb-level only. Selfie Check doesn't reach it.
+
+**What would help.** Say that in the AgentBook docs themselves. It would have saved us
+building on an assumption the prize pages never contradicted — and it's worth pairing with
+how thin Orb access already is geographically, since together they make AgentBook a
+narrower door than either page alone suggests.
+
+---
+
 ## Sandbox and Orb — geography we hit before we hit code
 
 Orb verification is not something we can reach as a two-person remote team: the official
