@@ -269,3 +269,37 @@ test('a symbol answer that is not an answer refuses by name', () => {
   // вызывающего чинить запрос там, где чинить нечего.
   assert.equal(shapeSymbolMatches(JSON.stringify({ data: { tokens: [] } })).ok, true);
 });
+
+// Потолок на платёж — настоящий, а не проверка «перед».
+//
+// Ревью на signer-mcp#19 право по сути и неточно в деталях: потолок существовал и до
+// правки — библиотека режет на `$1` за платёж по умолчанию. Только запрос стоит цент,
+// то есть защита была в сто раз слабее нужной, и подорожавший до 99 центов вызов
+// подписался бы молча. Здесь потолок задан явно и проверяется НАСТОЯЩЕЙ заготовкой 402,
+// снятой со шлюза: меняется в ней только сумма.
+//
+// 🔴 Первая версия этого теста строила заготовку руками, и отказ пришёл от разбора, а не
+// от потолка — то есть тест был зелёным, ничего не проверив. Фикстура снята с прода.
+test('a 402 above the ceiling is refused before anything is signed', async () => {
+  const { readFileSync } = await import('node:fs');
+  const challengePath = new URL('./fixtures/challenge-402.json', import.meta.url);
+  const challenge = JSON.parse(readFileSync(challengePath, 'utf8'));
+  const serve = (amountAtomic) => {
+    const c = JSON.parse(JSON.stringify(challenge));
+    c.accepts[0].amount = String(amountAtomic);
+    const header = Buffer.from(JSON.stringify(c)).toString('base64');
+    return async () => new Response('{}', { status: 402, headers: { 'payment-required': header } });
+  };
+  const key = `0x${'11'.repeat(32)}`;
+
+  // Пять центов при потолке в два: подписи быть не должно.
+  const over = await paidQuery({ privateKey: key, fetchImpl: serve(50_000) });
+  assert.equal(over.ok, false, 'платёж выше потолка прошёл');
+  assert.notEqual(over.reason, undefined);
+  // Отказ обязан быть ПРО ДЕНЬГИ, а не про разбор: разбор ломается и на верной сумме.
+  assert.match(
+    `${over.reason} ${JSON.stringify(over.detail ?? '')}`,
+    /amount|limit|spend|exceed|max/i,
+    `отказ не про сумму — потолок не сработал: ${over.reason} / ${JSON.stringify(over.detail)}`,
+  );
+});
