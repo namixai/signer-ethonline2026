@@ -292,6 +292,14 @@ test('a 402 above the ceiling is refused before anything is signed', async () =>
   };
   const key = `0x${'11'.repeat(32)}`;
 
+  // 🔴 ИЗОЛИРУЕМ ОКРУЖЕНИЕ. paidQuery читает X402_MAX_PER_PAYMENT при сборке клиента,
+  // так что при значении выше $0.05 на машине этот тест перестаёт проверять умолчание и
+  // начинает проверять то, что стоит у запускающего. Тест, зависящий от чужой машины,
+  // зелен по случайности.
+  const saved = process.env.X402_MAX_PER_PAYMENT;
+  delete process.env.X402_MAX_PER_PAYMENT;
+  try {
+
   // Пять центов при потолке в два: подписи быть не должно.
   const over = await paidQuery({ privateKey: key, fetchImpl: serve(50_000) });
   assert.equal(over.ok, false, 'платёж выше потолка прошёл');
@@ -302,6 +310,11 @@ test('a 402 above the ceiling is refused before anything is signed', async () =>
     /amount|limit|spend|exceed|max/i,
     `отказ не про сумму — потолок не сработал: ${over.reason} / ${JSON.stringify(over.detail)}`,
   );
+
+  } finally {
+    if (saved === undefined) delete process.env.X402_MAX_PER_PAYMENT;
+    else process.env.X402_MAX_PER_PAYMENT = saved;
+  }
 });
 
 // Срок обязан дойти до НИЖНЕГО вызова.
@@ -313,15 +326,65 @@ test('a 402 above the ceiling is refused before anything is signed', async () =>
 //
 // Проверено и живьём, на неотвечающем адресе: при пороге 2500 мс отказ пришёл за 2526 мс
 // с `paid_request_failed`, `spendUnknown: true` и «operation was aborted due to timeout».
-test('the deadline reaches the fetch that actually goes out', async () => {
-  let sawSignal = null;
-  const probe = async (_url, init) => {
-    sawSignal = init?.signal ?? null;
-    return new Response('{}', { status: 402, headers: { 'payment-required': '' } });
-  };
-  await paidQuery({ privateKey: `0x${'11'.repeat(32)}`, fetchImpl: probe, timeoutMs: 5_000 });
+test('🔴 the deadline fires on the PAID retry, not just on the first call', async () => {
+  // Первая редакция этого теста возвращала пустой заголовок `payment-required`, поэтому
+  // paidQuery падал ещё на разборе первой 402 — ДО повтора с оплатой и до срабатывания
+  // срока. Он был зелёным и при отсутствующем сроке: проверял, что сигнал передан, а не
+  // что он что-то отменяет. Ревью право, и это ровно наш класс — проверка, названная по
+  // правке, обязана умирать вместе с ней.
+  const { readFileSync } = await import('node:fs');
+  const challenge = readFileSync(new URL('./fixtures/challenge-402.json', import.meta.url), 'utf8');
+  const header = Buffer.from(challenge).toString('base64');
 
-  assert.ok(sawSignal, 'до нижнего fetch не дошёл signal — срок не действует');
-  assert.equal(typeof sawSignal.aborted, 'boolean');
-  assert.equal(sawSignal.aborted, false, 'сигнал пришёл уже сработавшим');
+  const seen = [];
+  const twoSteps = (url, init) => {
+    seen.push(init?.signal ?? null);
+    // Первый вызов отдаёт НАСТОЯЩУЮ заготовку, чтобы обёртка пошла платить.
+    if (seen.length === 1) {
+      return Promise.resolve(new Response('{}', { status: 402, headers: { 'payment-required': header } }));
+    }
+    // Второй — платный повтор — висит, пока его не отменит срок.
+    return new Promise((_resolve, reject) => {
+      const s = init?.signal;
+      if (!s) return; // без сигнала висим вечно: тест обязан упасть по своему таймауту
+      if (s.aborted) return reject(new Error('The operation was aborted'));
+      s.addEventListener('abort', () => reject(new Error('The operation was aborted due to timeout')));
+    });
+  };
+
+  // 🔴 СТРАХОВКА, И ОНА НУЖНА. При сломанном сроке этот тест не падал бы, а ВИС —
+  // проверено мутацией «сигнал передаётся, но никогда не срабатывает». Висящий тест в CI
+  // хуже упавшего: он не называет причину и съедает прогон целиком. Гонка с собственным
+  // таймером превращает зависание в внятный отказ.
+  const started = Date.now();
+  const stuck = Symbol('stuck');
+  const r = await Promise.race([
+    paidQuery({ privateKey: `0x${'11'.repeat(32)}`, fetchImpl: twoSteps, timeoutMs: 1_200 }),
+    new Promise((resolve) => setTimeout(() => resolve(stuck), 6_000)),
+  ]);
+  const took = Date.now() - started;
+  assert.notEqual(r, stuck, `срок не сработал: вызов висел дольше шести секунд (${took} мс)`);
+
+  assert.equal(seen.length, 2, `платного повтора не было: вызовов ${seen.length}`);
+  assert.ok(seen[1], 'до платного повтора не дошёл signal — срок на нём не действует');
+  assert.ok(took < 6_000, `срок не сработал: висели ${took} мс`);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'paid_request_failed');
+  // 🔴 Отмена ПОСЛЕ ухода платёжного заголовка не говорит, что деньги не списаны.
+  assert.equal(r.spendUnknown, true, '«денег не сняли» утверждать нельзя — заголовок уже ушёл');
+});
+
+test('shaping refuses a limit the query itself would refuse', () => {
+  const rows = (n) => JSON.stringify({ data: { tokens: Array.from({ length: n }, () => ({ symbol: 'WETH' })) } });
+  // 🔴 Ноль — не «потолок достигнут», а «спросили ноль строк». Раньше это возвращало
+  // ok и saturated: true, то есть пустой ответ выдавался за упершийся в предел.
+  const zero = shapeSymbolMatches(rows(0), 0);
+  assert.equal(zero.ok, false, 'предел 0 принят — пустой ответ объявлен достигнутым потолком');
+  assert.equal(zero.reason, 'bad_limit');
+  for (const bad of [-1, 1001, 2.5, 'x', null]) {
+    assert.equal(shapeSymbolMatches(rows(1), bad).ok, false, `принят предел ${String(bad)}`);
+  }
+  // Годные пределы по-прежнему работают, иначе проверка просто запрещает функцию.
+  assert.equal(shapeSymbolMatches(rows(0)).ok, true);
+  assert.equal(shapeSymbolMatches(rows(0)).saturated, false);
 });
