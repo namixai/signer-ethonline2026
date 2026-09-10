@@ -234,6 +234,7 @@ export async function paidQuery({
   gateway = GATEWAY,
   privateKey = process.env.X402_PRIVATE_KEY,
   fetchImpl = fetch,
+  timeoutMs = 60_000,
 } = {}) {
   if (!privateKey) {
     // Refusing beats an unpaid request that 402s and looks like a gateway fault.
@@ -274,6 +275,10 @@ export async function paidQuery({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query }),
+      // 🔴 Срок есть и у платного пути. `@x402/fetch` пробрасывает signal через повтор с
+      // оплатой, и без него молчащий шлюз оставляет вызов висеть навсегда. Отмена НЕ
+      // означает, что денег не сняли, — поэтому ниже по-прежнему `spendUnknown`.
+      signal: AbortSignal.timeout(timeoutMs),
     });
     // Read as text, never as .json() — the exact bytes are the thing being attested.
     rawBody = await res.text();
