@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY } from '../src/fetch.js';
+import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY, SYMBOL_MATCH_LIMIT } from '../src/fetch.js';
 
 // The real challenge, captured from the live gateway on 2026-09-01 (free — reading a
 // 402 costs nothing).
@@ -184,10 +184,45 @@ test('asking by ticker returns every namesake, not the first one', () => {
   assert.match(q, /symbol: "WETH"/);
   // 🔴 Не `first: 1`. Взять первую строку — значит выбрать однофамильца ровно так же
   // часто, как нужный токен, и не узнать об этом.
-  assert.match(q, /first: 20/);
+  assert.match(q, new RegExp(`first: ${SYMBOL_MATCH_LIMIT}`));
   for (const bad of ['', 'a'.repeat(33), 'DROP TABLE', '"; }']) {
     assert.throws(() => priceQueryBySymbol(bad), /not a plausible symbol/, `принят мусор: ${String(bad)}`);
   }
+});
+
+// Предел выдачи объявлен, а не спрятан.
+//
+// Ревью справедливо заметило: срезка на двадцати молча теряла совпадения. Пагинация тут
+// не решение — КАЖДАЯ страница это платный запрос, и тикер с тысячей однофамильцев
+// опустошил бы кошелёк, отвечая на один вопрос. Поэтому потолок поднят до сотни, задан
+// явно и проверяется, а насыщение вызывающий обязан увидеть отдельным словом.
+test('the result ceiling is explicit and bounded by what the gateway accepts', () => {
+  assert.equal(SYMBOL_MATCH_LIMIT, 100);
+  assert.match(priceQueryBySymbol('WETH', 7), /first: 7/);
+  for (const bad of [0, -1, 1001, 2.5, 'x', null]) {
+    // 1000 — потолок самого The Graph. Запрос сверх него шлюз отвергает, и отвергает
+    // ПОСЛЕ списания: за такую опечатку платит вызывающий, поэтому проверяем здесь.
+    assert.throws(() => priceQueryBySymbol('WETH', bad), /limit must be an integer/, `принят предел ${String(bad)}`);
+  }
+});
+
+// 🔴 Побайтово, а не по фрагментам.
+//
+// Ревью право: проверки по кускам пропускают смену пробелов, полей и служебного блока —
+// байты запроса меняются, requestCID меняется, тест молчит. Здесь запрос сверяется целиком.
+// Вторая линия уже стоит в test/leverage.test.js: там от PRICE_QUERY берётся sha256 и
+// сверяется с числом, ЗАПИСАННЫМ в LEVERAGE-EVIDENCE.md, так что расхождение кода и
+// документа тоже красное. Эта проверка ближе к месту правки и потому заметнее.
+test('PRICE_QUERY is asserted byte for byte, not by fragments', () => {
+  const expected =
+    '{\n' +
+    '  tokens(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc) {\n' +
+    '    id symbol lastPriceUSD lastPriceBlockNumber\n' +
+    '  }\n' +
+    '  _meta { block { number timestamp } hasIndexingErrors }\n' +
+    '}';
+  assert.equal(PRICE_QUERY, expected,
+    'байты PRICE_QUERY изменились — requestCID в LEVERAGE-EVIDENCE.md больше не воспроизводится');
 });
 
 test('the recent query asks only for tokens that carry a price', () => {
