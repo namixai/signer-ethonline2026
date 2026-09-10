@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY, SYMBOL_MATCH_LIMIT } from '../src/fetch.js';
+import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY, SYMBOL_MATCH_LIMIT, shapeSymbolMatches } from '../src/fetch.js';
 
 // The real challenge, captured from the live gateway on 2026-09-01 (free — reading a
 // 402 costs nothing).
@@ -239,4 +239,33 @@ test('PRICE_QUERY is frozen, because LEVERAGE-EVIDENCE.md rests on its exact byt
   // может воспроизвести. Новые запросы добавляются РЯДОМ, этот не трогается.
   assert.match(PRICE_QUERY, /tokens\(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc\)/);
   assert.doesNotMatch(PRICE_QUERY, /where:/, 'в PRICE_QUERY появился фильтр — доказательство leverage сломано');
+});
+
+// Обещание из комментария обязано где-то исполняться.
+//
+// Ревью на #22 право: `priceQueryBySymbol` объяснял, что насыщение сообщается, а не
+// угадывается, — и до этой функции ничто в пакете его не сообщало. Флаг вычислял
+// потребитель, то есть читателю этих файлов обещали контракт, который файлы не держат.
+test('a symbol answer says whether it was cut off at the ceiling', () => {
+  const rows = (n) => JSON.stringify({ data: { tokens: Array.from({ length: n }, () => ({ symbol: 'WETH' })) } });
+
+  // Ровно потолок — «столько поместилось», а не «это все» и не «есть ещё».
+  assert.equal(shapeSymbolMatches(rows(SYMBOL_MATCH_LIMIT)).saturated, true);
+  assert.equal(shapeSymbolMatches(rows(SYMBOL_MATCH_LIMIT - 1)).saturated, false);
+  assert.equal(shapeSymbolMatches(rows(0)).saturated, false);
+
+  // Потолок берётся из аргумента, а не из умолчания: иначе проверка молчит при любом
+  // пределе, кроме одного, и запрос с `first: 3` считался бы ненасыщенным всегда.
+  assert.equal(shapeSymbolMatches(rows(3), 3).saturated, true);
+  assert.equal(shapeSymbolMatches(rows(3), 4).saturated, false);
+  assert.equal(shapeSymbolMatches(rows(3), 3).limit, 3);
+});
+
+test('a symbol answer that is not an answer refuses by name', () => {
+  assert.equal(shapeSymbolMatches('{').reason, 'body_not_json');
+  assert.equal(shapeSymbolMatches(JSON.stringify({ errors: [{ message: 'boom' }] })).reason, 'graphql_errors');
+  assert.equal(shapeSymbolMatches(JSON.stringify({ data: {} })).reason, 'no_tokens_field');
+  // 🔴 Пустой список — это ОТВЕТ «совпадений нет», а не сбой. Спутать их значит послать
+  // вызывающего чинить запрос там, где чинить нечего.
+  assert.equal(shapeSymbolMatches(JSON.stringify({ data: { tokens: [] } })).ok, true);
 });
