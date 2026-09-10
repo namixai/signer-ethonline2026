@@ -23,11 +23,127 @@ export const TESTNET_GATEWAY = 'https://testnet.gateway.thegraph.com/api/x402/su
 // Base mainnet, as the live gateway challenge states.
 export const PAYMENT_NETWORK = 'eip155:8453';
 
+// Двукратный запас к нынешней цене в цент: хватает на подорожание, но не на порядок.
+// Переопределяется только через окружение — см. paidQuery.
+export const MAX_PER_PAYMENT_DEFAULT = '$0.02';
+
 export const UNISWAP_V3_ETHEREUM = '4cKy6QQMc5tpfdx8yxfYeb9TLZmgLQe44ddW1G7NwkA6';
 
 /** Price and freshness. Both fields are load-bearing; see usability.js. */
 export const PRICE_QUERY = `{
   tokens(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc) {
+    id symbol lastPriceUSD lastPriceBlockNumber
+  }
+  _meta { block { number timestamp } hasIndexingErrors }
+}`;
+
+/**
+ * Ask for ONE token by its contract address.
+ *
+ * 🔴 A SYMBOL IS NOT A KEY, and we paid to learn it. Asking this subgraph for "WETH"
+ * returned five different token entities all calling themselves WETH, every one of them
+ * priced zero — the real Wrapped Ether was not among them. Anyone can deploy a token and
+ * name it whatever they like, so the ticker identifies a token the way a first name
+ * identifies a person. The address does not have that problem.
+ *
+ * The subgraph keys tokens by the lowercased address, so that is what goes in.
+ */
+export function priceQueryByAddress(address) {
+  const id = String(address).toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(id)) throw new Error(`not a contract address: ${address}`);
+  return `{
+  tokens(where: {id: "${id}"}) {
+    id symbol lastPriceUSD lastPriceBlockNumber
+  }
+  _meta { block { number timestamp } hasIndexingErrors }
+}`;
+}
+
+/**
+ * Ask by ticker, knowing the answer may be several tokens.
+ *
+ * Kept because a caller may only have a ticker, but it returns everything that matches
+ * so the ambiguity is visible rather than resolved by luck — taking the first row would
+ * pick a namesake as often as the token meant.
+ *
+ * 🔴 THE LIMIT IS DECLARED, NOT HIDDEN. A page is a paid request here — a cent each — so
+ * fetching pages until they run out spends an amount nobody agreed to in advance, and a
+ * ticker with a thousand namesakes would empty a wallet answering one question. Instead
+ * the ceiling is high enough that hitting it is remarkable, and the caller is told when
+ * it is hit: `saturated` means "there may be more, and this answer cannot see them",
+ * which is a different sentence from "these are all of them". Silently returning the
+ * first twenty said the second while meaning the first.
+ */
+export const SYMBOL_MATCH_LIMIT = 100;
+
+export function priceQueryBySymbol(symbol, limit = SYMBOL_MATCH_LIMIT) {
+  const sym = String(symbol);
+  if (!/^[A-Za-z0-9._-]{1,32}$/.test(sym)) throw new Error(`not a plausible symbol: ${symbol}`);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    // The Graph caps `first` at 1000; asking for more is a query the gateway refuses —
+    // and refuses AFTER charging, so the bound is checked here rather than paid for.
+    throw new Error(`limit must be an integer in 1..1000, got ${limit}`);
+  }
+  return `{
+  tokens(where: {symbol: "${sym}"}, first: ${limit}) {
+    id symbol lastPriceUSD lastPriceBlockNumber
+  }
+  _meta { block { number timestamp } hasIndexingErrors }
+}`;
+}
+
+/**
+ * Read a symbol query's answer, and say whether it was cut off.
+ *
+ * 🔴 THE PROMISE HAS TO LIVE SOMEWHERE. `priceQueryBySymbol` above explains that
+ * saturation is reported rather than inferred, and until this existed nothing in this
+ * package reported it — the flag was computed by a consumer, so a caller reading these
+ * files was promised a contract the files did not keep. Review on #22 caught exactly that.
+ *
+ * `saturated` is true when the answer holds precisely `limit` rows. That does NOT mean
+ * "these are all of them" and it does not mean "there are more": it means the ceiling was
+ * reached and whether anything lies beyond it cannot be seen from here. Saying that is
+ * the whole point — a truncated list of namesakes could otherwise support "the token you
+ * meant is not here" when the truth was "it did not fit".
+ */
+export function shapeSymbolMatches(rawBody, limit = SYMBOL_MATCH_LIMIT) {
+  // 🔴 ТОТ ЖЕ ДИАПАЗОН, ЧТО И У ЗАПРОСА. Без этого `shapeSymbolMatches(rows(0), 0)`
+  // возвращал ok и `saturated: true` — то есть ПУСТОЙ ответ объявлялся достигнутым
+  // потолком. Хуже обычной ошибки: вызывающий читает «есть ещё, просто не поместились»
+  // там, где совпадений нет вовсе, и идёт сужать запрос вместо того, чтобы менять токен.
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    return { ok: false, reason: 'bad_limit', detail: `limit must be an integer in 1..1000, got ${limit}` };
+  }
+  let parsed;
+  try {
+    parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
+  } catch (err) {
+    return { ok: false, reason: 'body_not_json', detail: String(err?.message ?? err) };
+  }
+  if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
+    return { ok: false, reason: 'graphql_errors', detail: parsed.errors };
+  }
+  const tokens = parsed?.data?.tokens;
+  if (!Array.isArray(tokens)) {
+    return { ok: false, reason: 'no_tokens_field', detail: typeof tokens };
+  }
+  return { ok: true, tokens, saturated: tokens.length === limit, limit };
+}
+
+/**
+ * The most recently priced tokens that actually carry a price.
+ *
+ * 🔴 The filter is the whole point. Ordering by `lastPriceBlockNumber` alone returns
+ * whatever was touched last, and measured on 2026-09-10 that was five zero-priced tokens
+ * twice in a row; widening to twenty gave five priced out of twenty. Three quarters of
+ * what a cent buys, unusable. With the filter, five of five came back priced.
+ *
+ * PRICE_QUERY above is deliberately NOT changed: `LEVERAGE-EVIDENCE.md` rests on the
+ * requestCID computed over its exact bytes, and a query nobody can reproduce is not
+ * evidence any more.
+ */
+export const RECENT_PRICED_QUERY = `{
+  tokens(where: {lastPriceUSD_gt: 0}, first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc) {
     id symbol lastPriceUSD lastPriceBlockNumber
   }
   _meta { block { number timestamp } hasIndexingErrors }
@@ -125,6 +241,7 @@ export async function paidQuery({
   gateway = GATEWAY,
   privateKey = process.env.X402_PRIVATE_KEY,
   fetchImpl = fetch,
+  timeoutMs = 60_000,
 } = {}) {
   if (!privateKey) {
     // Refusing beats an unpaid request that 402s and looks like a gateway fault.
@@ -144,8 +261,27 @@ export async function paidQuery({
   // retried — a paid path that could not pay. Caught by static analysis of the
   // package's own type declarations; untestable here by running it, because spending
   // is gated. When a path cannot be exercised, the types are the only check.
-  const client = new x402Client().register(PAYMENT_NETWORK, new ExactEvmScheme(account));
-  const paidFetch = wrapFetchWithPayment(fetchImpl, client);
+  // 🔴 ПОТОЛОК НА ПЛАТЁЖ, И ОН НЕ У АГЕНТА. Ревью на signer-mcp#19 право в сути и
+  // неточно в деталях: потолок тут есть и до этой правки — библиотека режет на `$1` за
+  // платёж по умолчанию. Только наш запрос стоит цент, то есть защита была в СТО РАЗ
+  // слабее нужной: вызов, подорожавший до девяноста девяти центов, подписался бы молча.
+  //
+  // Значение приходит из окружения, как и ключ: его задаёт тот, чьи деньги, а не тот,
+  // кто вызывает инструмент. Аргумента для него нет намеренно — иначе агент, которому
+  // дали этот модуль, поднял бы себе потолок сам.
+  const client = x402Client.fromConfig({
+    schemes: [{ network: PAYMENT_NETWORK, client: new ExactEvmScheme(account) }],
+    spendControls: { maxAmountPerPayment: process.env.X402_MAX_PER_PAYMENT ?? MAX_PER_PAYMENT_DEFAULT },
+  });
+  // 🔴 СРОК НАВЕШИВАЕТСЯ НА ВНУТРЕННИЙ ВЫЗОВ, а не передаётся обёртке. Замер 10.09:
+  // `wrapFetchWithPayment` ТЕРЯЕТ `signal` из init — до нижнего fetch он не доходит
+  // вовсе. Ревью предполагало обратное, и передача сигнала обёртке добавила бы срок,
+  // который никуда не ведёт: молчащий шлюз всё равно оставлял бы вызов висеть вечно.
+  // Поэтому оборачиваем сам fetchImpl и ставим сигнал на каждый его вызов, включая
+  // повтор с оплатой.
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const timedFetch = (url, init) => fetchImpl(url, { ...init, signal: deadline });
+  const paidFetch = wrapFetchWithPayment(timedFetch, client);
 
   let res;
   let rawBody;

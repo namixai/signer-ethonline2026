@@ -277,3 +277,25 @@ test('🔴 a malformed block number is a named refusal, not an escaped SyntaxErr
     assert.equal(r.reason, 'bad_chain_head');
   }
 });
+
+// Байты обязаны хешироваться как байты.
+//
+// Функция объявляет, что принимает Uint8Array, и до правки прогоняла его через
+// stringToBytes — хешировала текстовое представление массива вместо самих байтов. Замер
+// на НАСТОЯЩЕМ записанном ответе: строкой проходит, теми же байтами даёт
+// `response_cid_mismatch`. Ломалось при этом самое дорогое: сверка подписи индексера
+// начинала проверять не то, что пришло, и объявляла годный ответ подделанным.
+// Найдено ревью CodeRabbit на signer-mcp#19.
+test('🔴 the same body verifies the same whether it arrives as text or as bytes', async () => {
+  const body = raw('sample1.body.json');
+  const attestation = att('sample1.attestation.json');
+
+  const asText = await verifyAttestation(body, attestation);
+  const asBytes = await verifyAttestation(new TextEncoder().encode(body), attestation);
+
+  assert.equal(asText.ok, true, `строкой не прошло: ${asText.reason}`);
+  assert.equal(asBytes.ok, true, `байтами не прошло: ${asBytes.reason} — байты хешируются не как байты`);
+  // Не только оба ok: вердикт обязан быть ТЕМ ЖЕ, включая восстановленные поля.
+  assert.equal(asBytes.responseCID, asText.responseCID);
+  assert.equal(asBytes.allocationId, asText.allocationId);
+});

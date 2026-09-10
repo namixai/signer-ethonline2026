@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeChallenge, quote, paidQuery } from '../src/fetch.js';
+import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY, SYMBOL_MATCH_LIMIT, shapeSymbolMatches } from '../src/fetch.js';
 
 // The real challenge, captured from the live gateway on 2026-09-01 (free — reading a
 // 402 costs nothing).
@@ -160,4 +160,231 @@ test('null challenge fields are refused, not returned as a confident ok', () => 
     decodeChallenge(b64({ accepts: [{ ...base, amount: '1.5' }] })).reason,
     'challenge_amount_not_an_integer',
   );
+});
+
+// Тикер — не ключ, и это куплено за деньги, а не выведено рассуждением.
+//
+// Замер 10.09: запрос `tokens(where: {symbol: "WETH"})` вернул ПЯТЬ разных сущностей,
+// все с символом WETH, у всех цена ноль. Настоящего Wrapped Ether среди них не было.
+// Токен с любым тикером может задеплоить кто угодно, поэтому тикер опознаёт токен так же,
+// как имя опознаёт человека. Адрес контракта этой беды лишён.
+test('a token is asked for by address, and the address is validated', () => {
+  const q = priceQueryByAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
+  // Субграф ключует токены адресом в нижнем регистре: тот же адрес в другом регистре
+  // не найдёт ничего, и это молчаливый пустой ответ, а не ошибка.
+  assert.match(q, /id: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"/);
+  assert.doesNotMatch(q, /0xC02aaA39/, 'адрес уехал в запрос в исходном регистре');
+  for (const bad of ['WETH', '0x123', '', '0xzzzz39b223fe8d0a0e5c4f27ead9083c756cc2', null]) {
+    assert.throws(() => priceQueryByAddress(bad), /not a contract address/, `принят мусор: ${String(bad)}`);
+  }
+});
+
+test('asking by ticker returns every namesake, not the first one', () => {
+  const q = priceQueryBySymbol('WETH');
+  assert.match(q, /symbol: "WETH"/);
+  // 🔴 Не `first: 1`. Взять первую строку — значит выбрать однофамильца ровно так же
+  // часто, как нужный токен, и не узнать об этом.
+  assert.match(q, new RegExp(`first: ${SYMBOL_MATCH_LIMIT}`));
+  for (const bad of ['', 'a'.repeat(33), 'DROP TABLE', '"; }']) {
+    assert.throws(() => priceQueryBySymbol(bad), /not a plausible symbol/, `принят мусор: ${String(bad)}`);
+  }
+});
+
+// Предел выдачи объявлен, а не спрятан.
+//
+// Ревью справедливо заметило: срезка на двадцати молча теряла совпадения. Пагинация тут
+// не решение — КАЖДАЯ страница это платный запрос, и тикер с тысячей однофамильцев
+// опустошил бы кошелёк, отвечая на один вопрос. Поэтому потолок поднят до сотни, задан
+// явно и проверяется, а насыщение вызывающий обязан увидеть отдельным словом.
+test('the result ceiling is explicit and bounded by what the gateway accepts', () => {
+  assert.equal(SYMBOL_MATCH_LIMIT, 100);
+  assert.match(priceQueryBySymbol('WETH', 7), /first: 7/);
+  for (const bad of [0, -1, 1001, 2.5, 'x', null]) {
+    // 1000 — потолок самого The Graph. Запрос сверх него шлюз отвергает, и отвергает
+    // ПОСЛЕ списания: за такую опечатку платит вызывающий, поэтому проверяем здесь.
+    assert.throws(() => priceQueryBySymbol('WETH', bad), /limit must be an integer/, `принят предел ${String(bad)}`);
+  }
+});
+
+// 🔴 Побайтово, а не по фрагментам.
+//
+// Ревью право: проверки по кускам пропускают смену пробелов, полей и служебного блока —
+// байты запроса меняются, requestCID меняется, тест молчит. Здесь запрос сверяется целиком.
+// Вторая линия уже стоит в test/leverage.test.js: там от PRICE_QUERY берётся sha256 и
+// сверяется с числом, ЗАПИСАННЫМ в LEVERAGE-EVIDENCE.md, так что расхождение кода и
+// документа тоже красное. Эта проверка ближе к месту правки и потому заметнее.
+test('PRICE_QUERY is asserted byte for byte, not by fragments', () => {
+  const expected =
+    '{\n' +
+    '  tokens(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc) {\n' +
+    '    id symbol lastPriceUSD lastPriceBlockNumber\n' +
+    '  }\n' +
+    '  _meta { block { number timestamp } hasIndexingErrors }\n' +
+    '}';
+  assert.equal(PRICE_QUERY, expected,
+    'байты PRICE_QUERY изменились — requestCID в LEVERAGE-EVIDENCE.md больше не воспроизводится');
+});
+
+test('the recent query asks only for tokens that carry a price', () => {
+  // Без фильтра замер дал пять нулевых из пяти дважды подряд, и пять годных из двадцати
+  // при расширении. С фильтром — пять из пяти.
+  assert.match(RECENT_PRICED_QUERY, /lastPriceUSD_gt: 0/);
+  assert.match(RECENT_PRICED_QUERY, /orderBy: lastPriceBlockNumber/);
+});
+
+// 🔴 Этот тест защищает не поведение, а доказательство.
+test('PRICE_QUERY is frozen, because LEVERAGE-EVIDENCE.md rests on its exact bytes', () => {
+  // requestCID в LEVERAGE-EVIDENCE.md вычислен над этими самыми байтами. Изменить их —
+  // значит превратить опубликованное доказательство в утверждение, которое никто не
+  // может воспроизвести. Новые запросы добавляются РЯДОМ, этот не трогается.
+  assert.match(PRICE_QUERY, /tokens\(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc\)/);
+  assert.doesNotMatch(PRICE_QUERY, /where:/, 'в PRICE_QUERY появился фильтр — доказательство leverage сломано');
+});
+
+// Обещание из комментария обязано где-то исполняться.
+//
+// Ревью на #22 право: `priceQueryBySymbol` объяснял, что насыщение сообщается, а не
+// угадывается, — и до этой функции ничто в пакете его не сообщало. Флаг вычислял
+// потребитель, то есть читателю этих файлов обещали контракт, который файлы не держат.
+test('a symbol answer says whether it was cut off at the ceiling', () => {
+  const rows = (n) => JSON.stringify({ data: { tokens: Array.from({ length: n }, () => ({ symbol: 'WETH' })) } });
+
+  // Ровно потолок — «столько поместилось», а не «это все» и не «есть ещё».
+  assert.equal(shapeSymbolMatches(rows(SYMBOL_MATCH_LIMIT)).saturated, true);
+  assert.equal(shapeSymbolMatches(rows(SYMBOL_MATCH_LIMIT - 1)).saturated, false);
+  assert.equal(shapeSymbolMatches(rows(0)).saturated, false);
+
+  // Потолок берётся из аргумента, а не из умолчания: иначе проверка молчит при любом
+  // пределе, кроме одного, и запрос с `first: 3` считался бы ненасыщенным всегда.
+  assert.equal(shapeSymbolMatches(rows(3), 3).saturated, true);
+  assert.equal(shapeSymbolMatches(rows(3), 4).saturated, false);
+  assert.equal(shapeSymbolMatches(rows(3), 3).limit, 3);
+});
+
+test('a symbol answer that is not an answer refuses by name', () => {
+  assert.equal(shapeSymbolMatches('{').reason, 'body_not_json');
+  assert.equal(shapeSymbolMatches(JSON.stringify({ errors: [{ message: 'boom' }] })).reason, 'graphql_errors');
+  assert.equal(shapeSymbolMatches(JSON.stringify({ data: {} })).reason, 'no_tokens_field');
+  // 🔴 Пустой список — это ОТВЕТ «совпадений нет», а не сбой. Спутать их значит послать
+  // вызывающего чинить запрос там, где чинить нечего.
+  assert.equal(shapeSymbolMatches(JSON.stringify({ data: { tokens: [] } })).ok, true);
+});
+
+// Потолок на платёж — настоящий, а не проверка «перед».
+//
+// Ревью на signer-mcp#19 право по сути и неточно в деталях: потолок существовал и до
+// правки — библиотека режет на `$1` за платёж по умолчанию. Только запрос стоит цент,
+// то есть защита была в сто раз слабее нужной, и подорожавший до 99 центов вызов
+// подписался бы молча. Здесь потолок задан явно и проверяется НАСТОЯЩЕЙ заготовкой 402,
+// снятой со шлюза: меняется в ней только сумма.
+//
+// 🔴 Первая версия этого теста строила заготовку руками, и отказ пришёл от разбора, а не
+// от потолка — то есть тест был зелёным, ничего не проверив. Фикстура снята с прода.
+test('a 402 above the ceiling is refused before anything is signed', async () => {
+  const { readFileSync } = await import('node:fs');
+  const challengePath = new URL('./fixtures/challenge-402.json', import.meta.url);
+  const challenge = JSON.parse(readFileSync(challengePath, 'utf8'));
+  const serve = (amountAtomic) => {
+    const c = JSON.parse(JSON.stringify(challenge));
+    c.accepts[0].amount = String(amountAtomic);
+    const header = Buffer.from(JSON.stringify(c)).toString('base64');
+    return async () => new Response('{}', { status: 402, headers: { 'payment-required': header } });
+  };
+  const key = `0x${'11'.repeat(32)}`;
+
+  // 🔴 ИЗОЛИРУЕМ ОКРУЖЕНИЕ. paidQuery читает X402_MAX_PER_PAYMENT при сборке клиента,
+  // так что при значении выше $0.05 на машине этот тест перестаёт проверять умолчание и
+  // начинает проверять то, что стоит у запускающего. Тест, зависящий от чужой машины,
+  // зелен по случайности.
+  const saved = process.env.X402_MAX_PER_PAYMENT;
+  delete process.env.X402_MAX_PER_PAYMENT;
+  try {
+
+  // Пять центов при потолке в два: подписи быть не должно.
+  const over = await paidQuery({ privateKey: key, fetchImpl: serve(50_000) });
+  assert.equal(over.ok, false, 'платёж выше потолка прошёл');
+  assert.notEqual(over.reason, undefined);
+  // Отказ обязан быть ПРО ДЕНЬГИ, а не про разбор: разбор ломается и на верной сумме.
+  assert.match(
+    `${over.reason} ${JSON.stringify(over.detail ?? '')}`,
+    /amount|limit|spend|exceed|max/i,
+    `отказ не про сумму — потолок не сработал: ${over.reason} / ${JSON.stringify(over.detail)}`,
+  );
+
+  } finally {
+    if (saved === undefined) delete process.env.X402_MAX_PER_PAYMENT;
+    else process.env.X402_MAX_PER_PAYMENT = saved;
+  }
+});
+
+// Срок обязан дойти до НИЖНЕГО вызова.
+//
+// 🔴 Ревью предполагало, что `@x402/fetch` пробрасывает `signal` из init через повтор с
+// оплатой. Замер 10.09 говорит обратное: до `fetchImpl` он не доходит вовсе. Значит
+// передача сигнала обёртке добавила бы срок, который никуда не ведёт, и молчащий шлюз
+// по-прежнему держал бы вызов вечно. Поэтому сигнал вешается на сам fetchImpl.
+//
+// Проверено и живьём, на неотвечающем адресе: при пороге 2500 мс отказ пришёл за 2526 мс
+// с `paid_request_failed`, `spendUnknown: true` и «operation was aborted due to timeout».
+test('🔴 the deadline fires on the PAID retry, not just on the first call', async () => {
+  // Первая редакция этого теста возвращала пустой заголовок `payment-required`, поэтому
+  // paidQuery падал ещё на разборе первой 402 — ДО повтора с оплатой и до срабатывания
+  // срока. Он был зелёным и при отсутствующем сроке: проверял, что сигнал передан, а не
+  // что он что-то отменяет. Ревью право, и это ровно наш класс — проверка, названная по
+  // правке, обязана умирать вместе с ней.
+  const { readFileSync } = await import('node:fs');
+  const challenge = readFileSync(new URL('./fixtures/challenge-402.json', import.meta.url), 'utf8');
+  const header = Buffer.from(challenge).toString('base64');
+
+  const seen = [];
+  const twoSteps = (url, init) => {
+    seen.push(init?.signal ?? null);
+    // Первый вызов отдаёт НАСТОЯЩУЮ заготовку, чтобы обёртка пошла платить.
+    if (seen.length === 1) {
+      return Promise.resolve(new Response('{}', { status: 402, headers: { 'payment-required': header } }));
+    }
+    // Второй — платный повтор — висит, пока его не отменит срок.
+    return new Promise((_resolve, reject) => {
+      const s = init?.signal;
+      if (!s) return; // без сигнала висим вечно: тест обязан упасть по своему таймауту
+      if (s.aborted) return reject(new Error('The operation was aborted'));
+      s.addEventListener('abort', () => reject(new Error('The operation was aborted due to timeout')));
+    });
+  };
+
+  // 🔴 СТРАХОВКА, И ОНА НУЖНА. При сломанном сроке этот тест не падал бы, а ВИС —
+  // проверено мутацией «сигнал передаётся, но никогда не срабатывает». Висящий тест в CI
+  // хуже упавшего: он не называет причину и съедает прогон целиком. Гонка с собственным
+  // таймером превращает зависание в внятный отказ.
+  const started = Date.now();
+  const stuck = Symbol('stuck');
+  const r = await Promise.race([
+    paidQuery({ privateKey: `0x${'11'.repeat(32)}`, fetchImpl: twoSteps, timeoutMs: 1_200 }),
+    new Promise((resolve) => setTimeout(() => resolve(stuck), 6_000)),
+  ]);
+  const took = Date.now() - started;
+  assert.notEqual(r, stuck, `срок не сработал: вызов висел дольше шести секунд (${took} мс)`);
+
+  assert.equal(seen.length, 2, `платного повтора не было: вызовов ${seen.length}`);
+  assert.ok(seen[1], 'до платного повтора не дошёл signal — срок на нём не действует');
+  assert.ok(took < 6_000, `срок не сработал: висели ${took} мс`);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'paid_request_failed');
+  // 🔴 Отмена ПОСЛЕ ухода платёжного заголовка не говорит, что деньги не списаны.
+  assert.equal(r.spendUnknown, true, '«денег не сняли» утверждать нельзя — заголовок уже ушёл');
+});
+
+test('shaping refuses a limit the query itself would refuse', () => {
+  const rows = (n) => JSON.stringify({ data: { tokens: Array.from({ length: n }, () => ({ symbol: 'WETH' })) } });
+  // 🔴 Ноль — не «потолок достигнут», а «спросили ноль строк». Раньше это возвращало
+  // ok и saturated: true, то есть пустой ответ выдавался за упершийся в предел.
+  const zero = shapeSymbolMatches(rows(0), 0);
+  assert.equal(zero.ok, false, 'предел 0 принят — пустой ответ объявлен достигнутым потолком');
+  assert.equal(zero.reason, 'bad_limit');
+  for (const bad of [-1, 1001, 2.5, 'x', null]) {
+    assert.equal(shapeSymbolMatches(rows(1), bad).ok, false, `принят предел ${String(bad)}`);
+  }
+  // Годные пределы по-прежнему работают, иначе проверка просто запрещает функцию.
+  assert.equal(shapeSymbolMatches(rows(0)).ok, true);
+  assert.equal(shapeSymbolMatches(rows(0)).saturated, false);
 });
