@@ -303,3 +303,25 @@ test('a 402 above the ceiling is refused before anything is signed', async () =>
     `отказ не про сумму — потолок не сработал: ${over.reason} / ${JSON.stringify(over.detail)}`,
   );
 });
+
+// Срок обязан дойти до НИЖНЕГО вызова.
+//
+// 🔴 Ревью предполагало, что `@x402/fetch` пробрасывает `signal` из init через повтор с
+// оплатой. Замер 10.09 говорит обратное: до `fetchImpl` он не доходит вовсе. Значит
+// передача сигнала обёртке добавила бы срок, который никуда не ведёт, и молчащий шлюз
+// по-прежнему держал бы вызов вечно. Поэтому сигнал вешается на сам fetchImpl.
+//
+// Проверено и живьём, на неотвечающем адресе: при пороге 2500 мс отказ пришёл за 2526 мс
+// с `paid_request_failed`, `spendUnknown: true` и «operation was aborted due to timeout».
+test('the deadline reaches the fetch that actually goes out', async () => {
+  let sawSignal = null;
+  const probe = async (_url, init) => {
+    sawSignal = init?.signal ?? null;
+    return new Response('{}', { status: 402, headers: { 'payment-required': '' } });
+  };
+  await paidQuery({ privateKey: `0x${'11'.repeat(32)}`, fetchImpl: probe, timeoutMs: 5_000 });
+
+  assert.ok(sawSignal, 'до нижнего fetch не дошёл signal — срок не действует');
+  assert.equal(typeof sawSignal.aborted, 'boolean');
+  assert.equal(sawSignal.aborted, false, 'сигнал пришёл уже сработавшим');
+});

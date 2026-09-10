@@ -266,7 +266,15 @@ export async function paidQuery({
     schemes: [{ network: PAYMENT_NETWORK, client: new ExactEvmScheme(account) }],
     spendControls: { maxAmountPerPayment: process.env.X402_MAX_PER_PAYMENT ?? MAX_PER_PAYMENT_DEFAULT },
   });
-  const paidFetch = wrapFetchWithPayment(fetchImpl, client);
+  // 🔴 СРОК НАВЕШИВАЕТСЯ НА ВНУТРЕННИЙ ВЫЗОВ, а не передаётся обёртке. Замер 10.09:
+  // `wrapFetchWithPayment` ТЕРЯЕТ `signal` из init — до нижнего fetch он не доходит
+  // вовсе. Ревью предполагало обратное, и передача сигнала обёртке добавила бы срок,
+  // который никуда не ведёт: молчащий шлюз всё равно оставлял бы вызов висеть вечно.
+  // Поэтому оборачиваем сам fetchImpl и ставим сигнал на каждый его вызов, включая
+  // повтор с оплатой.
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const timedFetch = (url, init) => fetchImpl(url, { ...init, signal: deadline });
+  const paidFetch = wrapFetchWithPayment(timedFetch, client);
 
   let res;
   let rawBody;
@@ -275,10 +283,6 @@ export async function paidQuery({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query }),
-      // 🔴 Срок есть и у платного пути. `@x402/fetch` пробрасывает signal через повтор с
-      // оплатой, и без него молчащий шлюз оставляет вызов висеть навсегда. Отмена НЕ
-      // означает, что денег не сняли, — поэтому ниже по-прежнему `spendUnknown`.
-      signal: AbortSignal.timeout(timeoutMs),
     });
     // Read as text, never as .json() — the exact bytes are the thing being attested.
     rawBody = await res.text();
