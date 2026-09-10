@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeChallenge, quote, paidQuery } from '../src/fetch.js';
+import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySymbol, RECENT_PRICED_QUERY, PRICE_QUERY } from '../src/fetch.js';
 
 // The real challenge, captured from the live gateway on 2026-09-01 (free — reading a
 // 402 costs nothing).
@@ -160,4 +160,48 @@ test('null challenge fields are refused, not returned as a confident ok', () => 
     decodeChallenge(b64({ accepts: [{ ...base, amount: '1.5' }] })).reason,
     'challenge_amount_not_an_integer',
   );
+});
+
+// Тикер — не ключ, и это куплено за деньги, а не выведено рассуждением.
+//
+// Замер 10.09: запрос `tokens(where: {symbol: "WETH"})` вернул ПЯТЬ разных сущностей,
+// все с символом WETH, у всех цена ноль. Настоящего Wrapped Ether среди них не было.
+// Токен с любым тикером может задеплоить кто угодно, поэтому тикер опознаёт токен так же,
+// как имя опознаёт человека. Адрес контракта этой беды лишён.
+test('a token is asked for by address, and the address is validated', () => {
+  const q = priceQueryByAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
+  // Субграф ключует токены адресом в нижнем регистре: тот же адрес в другом регистре
+  // не найдёт ничего, и это молчаливый пустой ответ, а не ошибка.
+  assert.match(q, /id: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"/);
+  assert.doesNotMatch(q, /0xC02aaA39/, 'адрес уехал в запрос в исходном регистре');
+  for (const bad of ['WETH', '0x123', '', '0xzzzz39b223fe8d0a0e5c4f27ead9083c756cc2', null]) {
+    assert.throws(() => priceQueryByAddress(bad), /not a contract address/, `принят мусор: ${String(bad)}`);
+  }
+});
+
+test('asking by ticker returns every namesake, not the first one', () => {
+  const q = priceQueryBySymbol('WETH');
+  assert.match(q, /symbol: "WETH"/);
+  // 🔴 Не `first: 1`. Взять первую строку — значит выбрать однофамильца ровно так же
+  // часто, как нужный токен, и не узнать об этом.
+  assert.match(q, /first: 20/);
+  for (const bad of ['', 'a'.repeat(33), 'DROP TABLE', '"; }']) {
+    assert.throws(() => priceQueryBySymbol(bad), /not a plausible symbol/, `принят мусор: ${String(bad)}`);
+  }
+});
+
+test('the recent query asks only for tokens that carry a price', () => {
+  // Без фильтра замер дал пять нулевых из пяти дважды подряд, и пять годных из двадцати
+  // при расширении. С фильтром — пять из пяти.
+  assert.match(RECENT_PRICED_QUERY, /lastPriceUSD_gt: 0/);
+  assert.match(RECENT_PRICED_QUERY, /orderBy: lastPriceBlockNumber/);
+});
+
+// 🔴 Этот тест защищает не поведение, а доказательство.
+test('PRICE_QUERY is frozen, because LEVERAGE-EVIDENCE.md rests on its exact bytes', () => {
+  // requestCID в LEVERAGE-EVIDENCE.md вычислен над этими самыми байтами. Изменить их —
+  // значит превратить опубликованное доказательство в утверждение, которое никто не
+  // может воспроизвести. Новые запросы добавляются РЯДОМ, этот не трогается.
+  assert.match(PRICE_QUERY, /tokens\(first: 5, orderBy: lastPriceBlockNumber, orderDirection: desc\)/);
+  assert.doesNotMatch(PRICE_QUERY, /where:/, 'в PRICE_QUERY появился фильтр — доказательство leverage сломано');
 });
