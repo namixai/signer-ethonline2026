@@ -160,15 +160,18 @@ hand and by launching the bundle directly.
 
 The Android track exists — "Android is distributed through a private Google Play
 testing track" — and we found that only after an hour on the Mac build. Our request
-for Android tester access has not been approved as of writing, so the honest state of
-this integration is: the asking half is written and reproduces your vectors, the
-receiving half is written and tested, and neither has ever met a real proof.
+for Android tester access was still unapproved when we checked on 10 September 2026,
+so the honest state of this integration on that date is: the asking half is written
+and reproduces your vectors, the receiving half is written and tested, and neither
+has ever met a real proof.
 
 **What would have helped, in order.** Say on the sandbox page, before the platform
 tabs, that a developer without an iPhone should go straight to Android — one line
-ahead of the fork costs nothing and would have saved us the hour. Second: the macOS
-build is offered by TestFlight and does not work; either stop offering it or say it
-is unsupported, because "available on this Mac" reads as an invitation. Third, and
+ahead of the fork costs nothing and would have saved us the hour. Second: **build
+1.0.100 (29165) is offered by TestFlight for Apple Silicon and does not run there** —
+withdraw that build for that configuration, or label it, because "works on this Mac"
+reads as an invitation. We are not claiming macOS is unsupported in general: we saw
+one build fail on one machine, and that is all we can say. Third, and
 this is the one that decides whether a team ships or not: Android tester approval has
 no visible queue or estimate, and a hackathon has a deadline. We are not asking for
 faster approval — we are asking to be able to see where we stand.
