@@ -144,6 +144,43 @@ turns a silent hour into an immediate error.
 
 ---
 
+## 9. The sandbox app is the prescribed way to test, and one of us could not run it at all
+
+The Sandbox App is how you tell developers to test remotely, and we could not get a
+single proof out of it. Not because of your protocol — everything on our side is
+written and tested — but because of where the app can run.
+
+Our developer has an Android phone. The portal's sandbox page led with the iOS tab,
+so that is the tab that was used, and TestFlight duly offered the build for macOS on
+Apple Silicon, marked as compatible with this Mac — 1.0.100 (29165). It installs.
+It does not run.
+Clicking Open in TestFlight starts it and it exits immediately — no window, no crash
+report in DiagnosticReports, nothing in the unified log. We reproduced it both by
+hand and by launching the bundle directly.
+
+The Android track exists — "Android is distributed through a private Google Play
+testing track" — and we found that only after an hour on the Mac build. Our request
+for Android tester access was still unapproved when we checked on 10 September 2026,
+so the honest state of this integration on that date is: the asking half is written
+and reproduces your vectors, the receiving half is written and tested, and neither
+has ever met a real proof.
+
+**What would have helped, in order.** Say on the sandbox page, before the platform
+tabs, that a developer without an iPhone should go straight to Android — one line
+ahead of the fork costs nothing and would have saved us the hour. Second: **build
+1.0.100 (29165) is offered by TestFlight for Apple Silicon and does not run there** —
+withdraw that build for that configuration, or label it, because "works on this Mac"
+reads as an invitation. We are not claiming macOS is unsupported in general: we saw
+one build fail on one machine, and that is all we can say. Third, and
+this is the one that decides whether a team ships or not: Android tester approval has
+no visible queue or estimate, and a hackathon has a deadline. We are not asking for
+faster approval — we are asking to be able to see where we stand.
+
+None of this is a complaint about the protocol. We would have liked to show the whole
+path working, and we will not describe a verification we have not seen.
+
+---
+
 ## Sandbox and Orb — geography we hit before we hit code
 
 Orb verification is not something we can reach as a two-person remote team: the official
