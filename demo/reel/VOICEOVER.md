@@ -41,7 +41,7 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 |---|---|---|
 | 3:04 | frame 3 header, nonce | "Last, the part that needs nothing from us. No account, no token, no permission." |
 | 3:14 | `pcr0_sha384`, attestation doc | "The service returns a measurement of the code it is running, signed by the hardware." |
-| 3:22 | the `cast call`, `false`, then the closing lines | "Ask the registry on Base whether it is active. Right now it says false — one active measurement per owner, and another lane holds it. We would rather show you that than hide it. And the check that needs no registry is the one to judge us on: rebuild from the public clone, and compare." |
+| 3:22 | the `cast call`, its answer, then the closing lines | "Ask the registry on Base whether it is active — and read what it actually says, with the owner address beside it. 🔴 **READ THE SCREEN, DO NOT MEMORISE THIS.** The registry holds one active measurement per owner, and which of our lanes holds it moves; on 11 September it answers true under our owner, and an earlier version of this script said false because that was true when it was written. If it says false, say so and add that another lane holds the registration — that is worth a sentence, not alarm. Either way, close on the check that needs no registry at all: rebuild from the public clone, and compare." |
 
 ---
 
@@ -49,8 +49,10 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 
 Cut in this order, and stop as soon as it fits: every `[cut]` line, then the second sentence
 of Act 2's first block, then Act 3's 2:24 block entirely. Do **not** cut the boundary line at
-2:17 or the `false` explanation at 3:22 — those two are the honesty of the whole reel, and a
-reel that drops them is selling something else.
+2:17 or the registry reading at 3:22 — those two are the honesty of the whole reel, and a
+reel that drops them is selling something else. (That line used to be called "the false
+explanation", from when the registry answered false; the point was never the word, it was
+reading the chain out loud instead of telling the viewer what it would say.)
 
 ## What is deliberately not said
 
