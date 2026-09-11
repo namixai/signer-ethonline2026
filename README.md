@@ -78,17 +78,43 @@ Start with `vectors/README.md` if you want to check something rather than read s
 **There are two paths, and they cost different things — we would rather say so than have you
 find out.**
 
-- **Offline, one command, nothing needed from anyone.** `cd vectors` first — every command
-  in this section runs from there, and an earlier version of this list omitted that, so the
-  "one command" claim failed at the reader's prompt. `python3 verify_ours.py` and
-  `python3 falsify.py` use the standard library only: no account, no key, no network. The
-  second one plants deliberate defects and every one must be caught — a suite that only
-  proves the right answer passes just as happily when both sides share a mistake. The run
-  prints how many; we deliberately do not repeat the number here, because a count in prose
-  goes stale the moment someone adds a case, and this one already had.
-- **Against Uniswap's own SDK, which needs the network once.** Still from `vectors/`:
-  `npm ci && node verify_sdk.mjs`
-  downloads viem and the Permit2 SDK. It is worth running because it checks our encoder
+- **Offline, one command, nothing needed from anyone:**
+
+  ```bash
+  cd vectors && make verify
+  ```
+
+  No account, no key, no network — standard library only. It runs our own encoder against
+  the pinned cases and then plants deliberate defects, every one of which must be caught,
+  because a suite that only proves the right answer passes just as happily when both sides
+  share a mistake. The run prints how many defects; we deliberately do not repeat the
+  number here, since a count in prose goes stale the moment someone adds a case, and this
+  one already had.
+
+  🔴 **This sentence has been wrong twice, so it is worth saying how it got fixed.** First
+  it omitted the `cd`, and the command failed at the reader's prompt. Then it still said
+  "one command" while naming two scripts — a reader counts what they type, and that was
+  four. Rather than soften the claim a third time we made it true: `make verify` is the
+  whole offline path. Falsification is inside it on purpose, not a separate target, because
+  making the part that proves the rest can go red opt-in is the same as not having it.
+- **Against Uniswap's own SDK, which needs the network once.**
+
+  🔴 `npm ci` here reports seventeen advisories, one of them high. They come in through
+  Uniswap's own SDK and its dependency tree, not from anything we wrote, and nothing in
+  that tree touches a signature: this path exists to check our encoder against theirs, it
+  holds no key and reaches no chain. We are not hiding the number behind a lockfile pin,
+  because the honest version is that a reviewer will see it and should know why it is
+  there. The offline path above has no dependencies at all.
+
+  Still from `vectors/`:
+
+  ```bash
+  make verify-sdk
+  ```
+
+  It downloads viem and the Permit2 SDK and runs **both** SDK cross-checks — the earlier
+  version of this line named only `verify_sdk.mjs` and quietly left the position-NFT one
+  out, which is the same understatement the offline claim above had. It is worth running because it checks our encoder
   against theirs rather than against itself, but it is not the one-command claim, and
   `onchain_fieldorder.mjs` additionally talks to a chain.
 
@@ -159,9 +185,13 @@ it lives in `demo/`:
 cd demo && ./demo.sh --frame 3
 ```
 
-It prints `false` from the attestation registry and says why that's the right answer, not
-a failure: production and demo are one owner with one active measurement at a time, and
-this frame reads the one that isn't currently live. The full sequence is in
+It asks the attestation registry whether the measurement it just fetched is registered,
+and prints the answer with the owner address beside it. 🔴 **Read the chain, not this
+sentence.** An earlier version of this paragraph told you the answer would be `false` and
+explained why that was fine; at the time it was. The registry keeps one active measurement
+per owner, so which of our lanes holds it moves, and a page that predicts the answer will
+be wrong sooner or later. The frame explains both readings when you run it. The full
+sequence is in
 `demo/STORYBOARD-hyperliquid.md`.
 
 ## Specs
@@ -173,11 +203,20 @@ this frame reads the one that isn't currently live. The full sequence is in
 | `specs/SPEC-uniswap-signature-surfaces.md` | What else gets a typed-data signature in the router path besides Permit2 — three commands that do, and one nested path that does even when the top-level call doesn't |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
 
-All four are in Russian. They are internal reading notes, published as they were written
-rather than translated for the occasion — the same choice `AI-USE.md` makes about the
-prompts, and for the same reason: a document tidied up after the fact describes the work
-instead of recording it. What each one settles is in the table above, in English; the
-reading itself isn't.
+🔴 **Russian, and not only here.** These four specs are in Russian, and so are thirty-six
+files across this repository — including `integrations/graph/README.md`, which documents
+the code this submission calls its window work, and `demo/STORYBOARD-hyperliquid.md`.
+`demo/precheck.sh` prints in Russian, and `npm run test:offline` gives Russian reasons for
+the tests it skips beside their English names. An earlier version of this paragraph said
+"all four are in Russian", which reads as a complete inventory and was not one.
+
+They are internal reading notes and internal test commentary, published as they were
+written rather than translated for the occasion — the same choice `AI-USE.md` makes about
+the prompts, and for the same reason: a document tidied up after the fact describes the
+work instead of recording it. Everything on the path a reader actually walks is in
+English: this file, the demo output, the test names, and the table above saying what each
+spec settles. The reading itself is not, and `integrations/graph/README.md` now opens by
+saying so in English before the Russian starts.
 
 ### Permit2, by file and line
 
@@ -265,7 +304,13 @@ The interesting claim is not in this repository. It is that you can rebuild the 
 image from a clean public clone and get the same measurement a running box reports — read
 live from its own `/attestation` endpoint, not quoted here, because it changes on every
 rotation and production and demo do not share one. That procedure lives in
-[namixai/signer](https://github.com/namixai/signer), and it is the one thing worth an hour
+[namixai/signer](https://github.com/namixai/signer) — the procedure is
+[`docs/VERIFY-SIGNER-YOURSELF.md`](https://github.com/namixai/signer/blob/main/docs/VERIFY-SIGNER-YOURSELF.md)
+and the closure check is
+[`poc/scripts/enclave-closure-check.py`](https://github.com/namixai/signer/blob/main/poc/scripts/enclave-closure-check.py).
+Both paths are spelled out because the obvious guesses — those filenames at the repository
+root — are 404s, and a reviewer who has to search for the thing we told them to run has
+already been given a worse answer than the one we meant. It is the one thing worth an hour
 of a reviewer's time.
 
 ## AI
