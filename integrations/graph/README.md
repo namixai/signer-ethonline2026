@@ -1,4 +1,30 @@
-# graph-snapshot — производящая половина слоя 3b-1
+# graph-snapshot — the producing half of layer 3b-1
+
+> **This file is in Russian below, and that is deliberate rather than an oversight.** It is
+> an internal working note, published as it was written instead of translated for the
+> occasion. If you are reading this as a reviewer, you do not need it: everything on the
+> path you walk is in English — the top-level `README.md`, the demo output, the test names,
+> and the commands below.
+>
+> **What this directory is, in four lines.** It reads a Uniswap V3 price from The Graph and
+> pays per query with x402 — a cent in USDC on Base, no API key, no account. It verifies
+> the indexer's attestation over the exact response bytes that arrived, and resolves that
+> signer on chain to an indexer with stake. It then asks, separately, whether the reading is
+> usable at all: a verified signature over a zero or a GraphQL error is not a price. And it
+> measures the price's own age apart from the subgraph head's, because a head can be fresh
+> while the price it carries is a year old.
+>
+> **Runnable, from this directory:**
+>
+> ```bash
+> npm ci && npm test      # the suite; the run prints the count
+> npm run demo            # the eight-step walkthrough, about a second
+> npm run leverage        # one query, several standardized deployments
+> ```
+>
+> 🔴 **Where this runs:** outside the enclave, every line of it. An enclave has no network,
+> so none of this can happen inside one. It decides what a price is worth trusting; it signs
+> nothing a venue would execute.
 
 Читает рынок Uniswap V3 из The Graph, **проверяет аттестацию индексатора** и собирает
 канонический снимок для политики Signer.
