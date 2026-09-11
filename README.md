@@ -107,8 +107,14 @@ find out.**
   there. The offline path above has no dependencies at all.
 
   Still from `vectors/`:
-  `npm ci && node verify_sdk.mjs`
-  downloads viem and the Permit2 SDK. It is worth running because it checks our encoder
+
+  ```bash
+  make verify-sdk
+  ```
+
+  It downloads viem and the Permit2 SDK and runs **both** SDK cross-checks — the earlier
+  version of this line named only `verify_sdk.mjs` and quietly left the position-NFT one
+  out, which is the same understatement the offline claim above had. It is worth running because it checks our encoder
   against theirs rather than against itself, but it is not the one-command claim, and
   `onchain_fieldorder.mjs` additionally talks to a chain.
 
@@ -179,9 +185,13 @@ it lives in `demo/`:
 cd demo && ./demo.sh --frame 3
 ```
 
-It prints `false` from the attestation registry and says why that's the right answer, not
-a failure: production and demo are one owner with one active measurement at a time, and
-this frame reads the one that isn't currently live. The full sequence is in
+It asks the attestation registry whether the measurement it just fetched is registered,
+and prints the answer with the owner address beside it. 🔴 **Read the chain, not this
+sentence.** An earlier version of this paragraph told you the answer would be `false` and
+explained why that was fine; at the time it was. The registry keeps one active measurement
+per owner, so which of our lanes holds it moves, and a page that predicts the answer will
+be wrong sooner or later. The frame explains both readings when you run it. The full
+sequence is in
 `demo/STORYBOARD-hyperliquid.md`.
 
 ## Specs

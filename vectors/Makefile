@@ -16,6 +16,7 @@
 # a reader skip the only part that proves the rest can go red.
 
 .POSIX:
+.NOTPARALLEL:
 .PHONY: verify verify-sdk verify-all
 
 verify:
@@ -37,4 +38,11 @@ verify-sdk:
 	@echo
 	@echo "✅ cross-checked against code that shares nothing with ours."
 
-verify-all: verify verify-sdk
+# 🔴 НЕ СПИСКОМ ЗАВИСИМОСТЕЙ. Под `make -j` GNU Make запустил бы обе цели разом: платная
+# сетевая проверка пошла бы даже при упавшей офлайновой, и вывод двух прогонов перемешался
+# бы так, что непонятно, кто из них отказал. Гейт, который ломается от флага параллельности,
+# перестаёт быть гейтом ровно тогда, когда его набирает кто-то незнакомый — а это и есть
+# наш случай. Рецепт из двух вызовов $(MAKE) держит порядок при любом -j.
+verify-all:
+	$(MAKE) verify
+	$(MAKE) verify-sdk
