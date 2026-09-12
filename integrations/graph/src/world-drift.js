@@ -5,8 +5,18 @@
 // "this agent has no registered human" — a refusal aimed at the user instead of at us.
 //
 // This one has a specific debt behind it. Our roadmap carried
-// 0xE1D1D3526A6FAa37eb36bD10B933C1b77f4561a4 as the AgentBook address from 28.08. There
-// is no contract at that address at all. Nothing caught it because nothing called it.
+// 0xE1D1D3526A6FAa37eb36bD10B933C1b77f4561a4 as the AgentBook address from 28.08, and
+// this comment used to say there was no contract at that address at all.
+//
+// 🔴 That was wrong, and it mis-described our own bug. Measured 12.09 with eth_getCode:
+// the address holds 3569 bytes on Base (8453) and nothing on World Chain (480) — and the
+// bytecode on Base is byte-for-byte identical to the AgentBook this file pins on 480
+// (0xA23aB2712eA7BBa896930544C7d6636a96b944dA, the same 3569 bytes, same sha256). Our own
+// AGENT_BOOK_DEPLOYMENTS lists 0xE1D1… as the Base deployment two files away.
+//
+// So the debt was never a dead address: it was an address named without its chain, read
+// on the other chain, coming back empty — the exact trap world.js warns about where the
+// chain object has to match the RPC. Nothing caught it because nothing called it.
 
 import { AGENT_BOOK_ADDRESS, WORLD_CHAIN, worldClient } from './world.js';
 import { isMain } from './is-main.js';

@@ -203,12 +203,29 @@ sequence is in
 | `specs/SPEC-uniswap-signature-surfaces.md` | What else gets a typed-data signature in the router path besides Permit2 — three commands that do, and one nested path that does even when the top-level call doesn't |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
 
-🔴 **Russian, and not only here.** These four specs are in Russian, and so are thirty-six
-files across this repository — including `integrations/graph/README.md`, which documents
-the code this submission calls its window work, and `demo/STORYBOARD-hyperliquid.md`.
-`demo/precheck.sh` prints in Russian, and `npm run test:offline` gives Russian reasons for
-the tests it skips beside their English names. An earlier version of this paragraph said
-"all four are in Russian", which reads as a complete inventory and was not one.
+🔴 **Russian, and not only here.** As of 12 September, **39 tracked files in this
+repository contain Russian** — the four specs above among them, and among the other
+thirty-five `integrations/graph/README.md`, which documents the code this submission calls
+its window work, and `demo/STORYBOARD-hyperliquid.md`. `demo/precheck.sh` prints in
+Russian, and `npm run test:offline` gives Russian reasons for the six tests it skips,
+beside their English names. Do not take the number on trust — it is every tracked file
+holding a Cyrillic character, and it moves as files are added:
+
+```bash
+git ls-files | grep -v node_modules | python3 -c "
+import pathlib, re, sys
+cyr = re.compile(r'[\u0400-\u04FF]')
+print(sum(1 for f in sys.stdin.read().split()
+          if cyr.search(pathlib.Path(f).read_text(errors='ignore'))))"
+```
+
+(Python rather than `grep -P`, because the `grep` shipped with macOS has no `-P` and would
+answer `invalid option` rather than a number. Checked on both.)
+
+This paragraph has now been wrong twice, in the same direction both times. It first said
+"all four are in Russian", which reads as a complete inventory and was not one; the
+replacement said "thirty-six files" and was a count nobody re-ran. A number in a document
+is a claim with a shelf life, so this one ships with the command that checks it.
 
 They are internal reading notes and internal test commentary, published as they were
 written rather than translated for the occasion — the same choice `AI-USE.md` makes about
@@ -219,6 +236,28 @@ spec settles. The reading itself is not, and `integrations/graph/README.md` now 
 saying so in English before the Russian starts.
 
 ### Permit2, by file and line
+
+🔴 **The boundary first, and a correction to what this file said a few hours ago.** What is
+in **this** repository is the Permit2 **digest**: built from the spec, checked against the
+deployed contract, reproduced by two implementations that share no code. No signing. That
+part has not changed.
+
+What changed is the sentence that followed it. Until today this file also said the signing
+action did not exist in the product either. **That is wrong, and it was wrong when written:**
+`namixai/signer` gained an enclave action `sign_permit2_permit_single` and a gateway route
+`POST /sign/permit2-permit-single` on 10 and 11 September — commits `865f418` and `17faf5a`
+on its `main`, in `poc/enclave/src/signer.rs`, `poc/enclave/src/proto.rs` and
+`poc/gateway/src/handlers.rs`. We asserted the state of another repository without opening
+it. It is corrected here rather than quietly edited out, because a reviewer can find those
+commits in a minute and should not have to wonder which of our sentences to trust.
+
+So the honest three lines:
+
+- **This submission** contains the digest work, and no signing. Nothing here will sign for you.
+- **The product** has the action in its source since 10–11 September.
+- **Nobody can exercise it from what we published:** the demo gateway answers 404 on that
+  route — measured — as it does on `/sign/order`. The demo lane exposes attestation, not
+  signing.
 
 The Uniswap track asks a README to point at the contracts and the lines of code, so here
 they are rather than a directory to go hunting in. Links are pinned to a commit, because a
@@ -247,9 +286,8 @@ is path B, running Uniswap's own `@uniswap/permit2-sdk` with its own type defini
 hands the question to the deployed contract, which recovers a signer from *its* digest and
 compares.
 
-🔴 **What this is not.** It builds and checks a digest. There is no Permit2 signing inside
-the enclave — that needs an action which does not exist yet, and writing otherwise would be
-a false claim in a public submission.
+**And the boundary again, now that you have seen the files:** everything above builds and
+checks a digest. None of it signs one.
 
 ### World ID, by file and line
 

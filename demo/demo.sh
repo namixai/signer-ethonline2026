@@ -124,26 +124,66 @@ run_frame_3() {
   note "Nothing here needs an account, a token, or our permission. This is the frame"
   note "the whole product rests on, and it is the only one that works for anyone today."
 
-  local nonce doc
+  local nonce body
   nonce=$(python3 -c 'import secrets;print(secrets.token_hex(16))')
   note "fresh nonce: ${nonce}   (the document is bound to it, so a replay is visible)"
 
-  doc=$(curl -s -D /tmp/.demo_hdr --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
-  local pcr0
-  pcr0=$(printf '%s' "$doc" | python3 -c '
-import sys,json
-d=json.load(sys.stdin)
-print("   pcr0_sha384        :", d.get("pcr0_sha384"), file=sys.stderr)
-print("   attestation_doc    : <%d chars of NSM-signed COSE> (not printed)" % len(d.get("attestation_doc_b64") or ""), file=sys.stderr)
-print(d.get("pcr0_sha384") or "")
-')
-  note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
+  # 🔴 A PRIVATE temp file now. The old fixed path under /tmp, in a world-writable
+  # directory, is a pre-created file or a symlink waiting to happen, and two runs of this
+  # script at once quietly read each other's headers. `mktemp` plus a trap costs one line,
+  # and the trap means the cleanup no longer has to be repeated at every `return`.
+  local hdr
+  hdr=$(mktemp -t demo_hdr) || { stub "frame 3 not run — mktemp failed"; return 0; }
+  trap 'rm -f "$hdr"' RETURN
+  body=$(curl -s -D "$hdr" --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
+  note "cache-control: $(grep -i '^cache-control' "$hdr" | tr -d '\r' | cut -d' ' -f2-)"
   note ""
 
-  # We deliberately do NOT print `registered_onchain` from the response. That field is read
-  # from an environment variable on the gateway, so it reports what the operator configured
-  # — it is our word about ourselves. The question "is this measurement registered" has an
-  # answer that owes us nothing, and this is it.
+  # 🔴 THE PCR0 NOW COMES OUT OF THE SIGNED DOCUMENT, AND IT USED TO NOT.
+  #
+  # This block read `pcr0_sha384` from the JSON body and handed that to the registry. That
+  # field is written by our own gateway. So the one step this frame rests on compared a
+  # number we typed against a registration we made, while the hardware signature sat in
+  # `attestation_doc_b64` with only its LENGTH printed and its bytes never opened. The
+  # frame claimed "a stranger checks the running code themselves", and at that step it
+  # was not true. The nonce was in the same condition: the line above says the document
+  # is bound to it, and nothing checked that either.
+  #
+  # attest-verify.py opens the COSE document: ES384 over the COSE Sig_structure against
+  # the leaf certificate, the certificate chain, and the nonce inside the document
+  # against the one we just sent. The JSON field becomes a CROSS-CHECK that can go red
+  # rather than the source of the answer. If any check fails it prints no PCR0 and the
+  # registry is not asked — a document we could not authenticate must not be able to
+  # fetch itself a `true`.
+  printf '%s' "$body" | python3 "$HERE/attest-verify.py" --nonce "${nonce}"
+  local pcr0 verdict
+  pcr0=$(printf '%s' "$body" | python3 "$HERE/attest-verify.py" --nonce "${nonce}" --pcr0-only 2>/dev/null)
+  verdict=$?
+  note ""
+  if [ -z "$pcr0" ]; then
+    # 🔴 A could-not-check is not a false, and the two must not print the same sentence.
+    # Conflating them is how a missing openssl turns into "the enclave failed", and how a
+    # real failure hides behind "probably just tooling".
+    if [ "$verdict" = "2" ]; then
+      stub "could not check the document here — this is NOT a verdict on the enclave"
+      note "The verifier needs openssl and a readable body; one of those was missing. The"
+      note "registry is not asked, because the PCR0 to ask about was never authenticated."
+    else
+      stub "the document DID NOT VERIFY — the registry is NOT being asked"
+      note "A red check above is this frame's answer, not a reason to skip it. Asking the"
+      note "registry about a PCR0 we could not authenticate would print a true that means"
+      note "nothing."
+    fi
+    return 0
+  fi
+
+  # 🔴 This comment used to say we deliberately do not print `registered_onchain` from the
+  # response. Measured against the live endpoint on 12.09, the response carries exactly
+  # three fields — `attestation_doc_b64`, `pcr0_sha384`, `timestamp_ms` — and no
+  # `registered_onchain` at all, so there was nothing left to decline to print. The reason
+  # outlives the field and is why the next line exists: any such flag would be read from
+  # the gateway's own configuration, making it our word about ourselves. The question "is
+  # this measurement registered" has an answer that owes us nothing, and this is it.
   note "Is that measurement registered on chain? Ask the registry, not us:"
   printf '   cast call %s "isPCR0Active(bytes)(bool,address)" 0x%s --rpc-url %s\n' \
     "$PCR0_REGISTRY" "$pcr0" "$BASE_RPC"
@@ -173,7 +213,6 @@ print(d.get("pcr0_sha384") or "")
   note "public clone and compare PCR0. That procedure is VERIFY-SIGNER-YOURSELF.md in"
   note "namixai/signer. We do not ask anyone to take the hash on faith — the point of"
   note "the frame is that they do not have to."
-  rm -f /tmp/.demo_hdr
 }
 
 echo "Usenami Signer — demo, run as a script so it can be re-run"

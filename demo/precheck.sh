@@ -23,6 +23,16 @@
 #      when it means "we are blind". So the gate proves its own eyesight on
 #      every run, against the same bytes, before it is allowed to say SAFE.
 #
+# What it does NOT cover, said here so a green run is not over-read. This gate is about
+# `/sign` response bodies and the redactor that renders them. Frame 3 prints the output of
+# `attest-verify.py` straight to the screen without passing it through the redactor, and
+# that is deliberate: the attestation endpoint is public and unauthenticated, so everything
+# the verifier prints — the measurement, the nonce, the certificate fingerprints, the
+# module id — is already handed to anyone who asks for it. The one identifier in there that
+# LOOKS like infrastructure, an enclave module id, is excluded by name in
+# `scripts/scrub-check.sh` for exactly that reason. If frame 3 ever starts printing a body
+# that needs a token to fetch, it belongs in this gate on the same day.
+#
 # Exit: 0 safe to film · 1 do not film · 2 the check itself could not run.
 set -uo pipefail
 

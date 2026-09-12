@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-09-07 (the window section below rewritten under fact — see the diff
+**Last updated:** 2026-09-12 (the window section below rewritten under fact — see the diff
 history of this file for the 2026-08-16 plan as first written; nothing there is deleted).
 
 ## The position in one sentence
@@ -20,7 +20,7 @@ Knowledge gathered before the event is not hidden — it is here, dated.
 | component | state before | public confirmation |
 |---|---|---|
 | **Signer enclave** — signing inside AWS Nitro, key never leaves | in development since May 2026, live service | public build repository, reproducible PCR0 |
-| **Reproducible build + attestation** | PCR0 rebuilds from a clean clone; a live NSM COSE document is served | `signer-demo.usenami.io/attestation` — **the demo box**. We run more than one enclave; ask this one and you are asking the demo lane, not the production lane. Whether a measurement is registered is a question for the chain: `isPCR0Active` on the registry contract, on Base. |
+| **Reproducible build + attestation** | PCR0 rebuilds from a clean clone; a live NSM COSE document is served | `signer-demo.usenami.io:8443/attestation` — **the demo box**. We run more than one enclave; ask this one and you are asking the demo lane, not the production lane. Whether a measurement is registered is a question for the chain: `isPCR0Active` on the registry contract, on Base. |
 | **EIP-712 signing (Hyperliquid)** | in production | sources in the public repository |
 | **`sign_data`** — data signed by a separate attested key | designed 06.2026, implemented in the main lane | design documents in the repository |
 | **attested-snapshot** — a signed market snapshot | schema contract v2, July 2026 | contract + public verification page |
@@ -62,7 +62,7 @@ quietly drops what it can't deliver is worse than one that says so.
 | promised | status | what actually happened |
 |---|---|---|
 | 1inch Fusion integration | **cut** | never started as integration code in this window. What exists is the 4 August knowledge and the 5 August spec, both already listed above as pre-window |
-| Uniswap Permit2 integration | **partial — digest only, does not sign** | `integrations/graph/src/permit2.js`, written in the window: builds and checks the EIP-712 digest against the 14 August spec, so the spec is runnable rather than read. It does not sign. Permit2 signing needs a new enclave action that does not exist, and — separately — is gated on the next key rotation; neither is a decision this document makes |
+| Uniswap Permit2 integration | **partial — digest only, does not sign** | `integrations/graph/src/permit2.js`, written in the window: builds and checks the EIP-712 digest against the 14 August spec, so the spec is runnable rather than read. It does not sign, and nothing in this repository will. 🔴 **Corrected 12 September:** this row used to add that the enclave action "does not exist", which was already untrue when written — `namixai/signer` has `sign_permit2_permit_single` and a gateway route for it on its `main` since 10–11 September (`865f418`, `17faf5a`). We described another repository from memory. The action is not deployed to the demo lane, which answers 404 on that route, so nothing we published lets anyone exercise it; that is a different sentence from "it does not exist", and the difference is the kind a reviewer checks |
 | Integration with 0G Compute TEE | **cut** | not a scope choice on our side: 0G disappeared from ETHOnline's own public prize roster on 28 August. The individual 0G prize page is still reachable; the general prize list no longer lists it. We were building toward a track that stopped being listed, and did not replace it with a different 0G integration |
 | "Data as a policy input": snapshot signature checked, freshness judged by enclave time, refusal before signing | **shipped, in a corrected shape** | see below — the enclave-time framing as originally written overclaimed, and the actual claim is narrower |
 | The verifier page | **cut** | not built this window. The 8 August spec (below) and the 6 August WASM proof-of-concept exist; the page connecting them does not. The window's engineering time went to the three integrations below instead, none of which were on this plan |

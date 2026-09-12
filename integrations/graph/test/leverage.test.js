@@ -193,3 +193,43 @@ test('and the healthy case still says the strong thing', async () => {
   assert.equal(r.deploymentsSampled, 2);
   assert.match(r.claimSupported, /identical requestCID attested by independent indexers/);
 });
+
+// Наблюдённое поле и пригодная цена — разные вещи.
+//
+// 🔴 Второй проход постороннего 12.09: на `uniswap-v3-base` пришёл свежий JitoSOL с ценой
+// ноль, и прогон читался как «купили ноль за цент». Клейм leverage при этом ВЕРЕН — он про
+// запрос и схему, а не про цену. Но рядом печатается `topPriceUSD`, и читатель, увидев
+// «поле наблюдалось» вместе с сильным клеймом, достраивает то, чего здесь не проверяли.
+// Поэтому пригодность считается отдельно и говорится словами.
+test('🔴 a run where every observed row is priced zero says so in the claim', async () => {
+  const zeroBody = (block = 100) => JSON.stringify({
+    data: {
+      tokens: [{ id: '0x9', symbol: 'JitoSOL', lastPriceUSD: '0', lastPriceBlockNumber: String(block) }],
+      _meta: { block: { number: block, timestamp: 1788785975 }, hasIndexingErrors: false },
+    },
+  });
+  const r = await measureLeverage({
+    deployments: two, paid: true,
+    paidImpl: async ({ query }) => ({
+      ok: true, status: 200, rawBody: zeroBody(), hasAttestation: true,
+      attestationHeader: JSON.stringify({ requestCID: CID }), _query: query,
+    }),
+  });
+
+  // Клейм про запрос СТОИТ — нулевая цена его не отменяет.
+  assert.equal(r.attestedSameRequest, true);
+  // И при этом прямо сказано, что цены не наблюдали.
+  assert.match(r.claimSupported, /NOT ONE observed row carried a usable price/,
+    'нулевая цена прошла молча — читатель достроит покупку цены');
+  assert.equal(r.usablePriceRows, 0);
+  assert.equal(r.unusablePriceRows, 2);
+});
+
+test('a run with real prices does NOT carry that warning', async () => {
+  // Иначе предыдущая проверка была бы зелёной при «предупреждать всегда», а
+  // предупреждение, которое стоит всегда, читатель перестаёт видеть.
+  const r = await measureLeverage({ deployments: two, paid: true, paidImpl: paidStub() });
+  assert.equal(r.usablePriceRows, 2);
+  assert.equal(r.unusablePriceRows, 0);
+  assert.doesNotMatch(r.claimSupported, /NOT ONE observed row/);
+});

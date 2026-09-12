@@ -5,9 +5,18 @@ AWS Nitro enclave that holds an agent's key and applies the owner's policy befor
 signature exists, so our contact with Permit2 is narrow and specific: we construct and check
 the EIP-712 digest, and we needed to be certain it is right before anything signs it. 🔴
 Scoped precisely, added after a review caught the earlier wording overreaching: this document
-covers digest construction and verification only. No Permit2-aware policy code exists in the
-enclave or gateway today, and nothing here signs a Permit2 payload — see "What this document
-does not claim" at the end.
+covers digest construction and verification only, and nothing in the repository it ships with
+signs a Permit2 payload.
+
+🔴 **Corrected 12 September, and worth the paragraph.** This sentence used to say no
+Permit2-aware code existed in our enclave or gateway. That stopped being true on 10–11
+September, and we did not notice because we were describing a second repository from memory
+rather than opening it: `namixai/signer` now carries an enclave action
+`sign_permit2_permit_single` and a gateway route for it. It is not deployed anywhere a reader
+can reach — the public demo answers 404 on that route — so nothing published lets anyone
+exercise it. But "not reachable" and "does not exist" are different claims, and a document
+whose whole value is that its claims are checkable should not blur them. See "What this
+document does not claim" at the end.
 
 Everything below is something we hit while building, with the check we used. Dates and
 addresses are given so a reader can tell what was current: **4 September 2026**.
@@ -156,8 +165,20 @@ checkable. It is the integrator-side conclusion we would have liked to read some
 ## What this document does not claim
 
 We built **digest construction and verification** — the vectors and the checks above are
-real and runnable. We did not build a policy layer for Permit2: no code in our enclave or
-gateway inspects a Permit2 payload today, so the "infinite allowance" design note above is a
-conclusion for when that code exists, not a description of a check that runs now. And we
-specifically did not build signing — that needs a signing action inside the attested image
-which does not exist yet. We would rather say so here than have either gap inferred.
+real and runnable. We did not build a policy layer for Permit2: no code inspects a Permit2
+payload against an owner's rules today, so the "infinite allowance" design note above is a
+conclusion for when that code exists, not a description of a check that runs now.
+
+🔴 **And the second half of this section was still wrong when the top of the file was
+already corrected — caught on 12 September by a reviewer reading both.** It said signing
+"needs a signing action inside the attested image which does not exist yet". The action
+exists: `sign_permit2_permit_single` in the enclave and a gateway route for it landed on
+`namixai/signer` main on 10–11 September. What holds is narrower and we should have written
+only this much: **nothing in this repository signs a Permit2 payload, and nothing published
+lets a reader exercise the action that does** — the public demo gateway answers 404 on that
+route, measured the same day.
+
+Correcting a claim in one paragraph and leaving it standing in another is the failure this
+document keeps describing in other people's code, so it is named here rather than quietly
+edited: the pointer at the top was rewritten first, and the section it points at was not
+read again until someone else read it.

@@ -79,7 +79,17 @@ test('normaliseV maps the raw recovery id, and refuses a bogus one', () => {
 test('the gateway really does send raw v, and a bogus id is refused end-to-end', async () => {
   const a = att('sample1.attestation.json');
   assert.equal(a.v, 0, 'both fixture samples carry raw v');
-  await assert.rejects(() => verifyAttestation(raw('sample1.body.json'), { ...a, v: 42 }));
+
+  // 🔴 Это утверждение ИЗМЕНИЛОСЬ, и не в сторону послабления. Раньше здесь стояло
+  // `assert.rejects`: негодный `v` ронял функцию, и тест это закреплял. Посторонний,
+  // проходивший поверхность 12.09, ломал подпись руками и получал стектрейс — то есть
+  // закреплённым оказалось именно то поведение, против которого весь остальной код.
+  // Замысел теста был «отвергается end-to-end», а броском он был лишь по случайности
+  // реализации. Теперь проверяется отказ по имени; отсутствие броска шире покрыто
+  // проверкой «a signature nobody can read» ниже.
+  const r = await verifyAttestation(raw('sample1.body.json'), { ...a, v: 42 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'attestation_unusable');
 });
 
 // ---- step 2: usability, which does NOT follow from step 1 ----
@@ -298,4 +308,116 @@ test('🔴 the same body verifies the same whether it arrives as text or as byte
   // Не только оба ok: вердикт обязан быть ТЕМ ЖЕ, включая восстановленные поля.
   assert.equal(asBytes.responseCID, asText.responseCID);
   assert.equal(asBytes.allocationId, asText.allocationId);
+});
+
+// Кривая подпись — отказ по имени, а не падение.
+//
+// 🔴 Найдено вторым проходом постороннего 12.09: он ломал подпись руками и видел
+// стектрейс. Замер тогда: из одиннадцати рукотворных порч ВОСЕМЬ бросали. Здесь это
+// дороже всего — у нас семьдесят два кода отказа и отдельный словарь, отличающий
+// «ответа нет» от «не смог спросить», и всё это обесценивается одним стектрейсом
+// на том шаге, который судья ломает первым.
+test('🔴 a signature nobody can read refuses by name, and never throws', async () => {
+  const body = raw('sample1.body.json');
+  const base = JSON.parse(raw('sample1.attestation.json'));
+
+  const corruptions = {
+    'нe-hex символ':      { r: `${base.r.slice(0, -1)}z` },
+    'без 0x':             { r: base.r.slice(2) },
+    'пустая строка':      { r: '' },
+    'нули':               { r: `0x${'0'.repeat(64)}` },
+    'двойная длина':      { r: base.r + base.r.slice(2) },
+    's нули':             { s: `0x${'0'.repeat(64)}` },
+    'v мусор':            { v: 99 },
+    'v строка':           { v: 'x' },
+  };
+
+  for (const [name, patch] of Object.entries(corruptions)) {
+    // Не в try/catch: брошенное исключение обязано ПРОВАЛИТЬ тест, а не быть им поймано.
+    const r = await verifyAttestation(body, { ...base, ...patch });
+    assert.equal(r.ok, false, `принята нечитаемая подпись: ${name}`);
+    assert.equal(r.reason, 'attestation_unusable', name);
+
+    // 🔴 И сообщение библиотеки НЕ уходит наружу: viem печатает отвергнутый скаляр
+    // целиком, то есть саму испорченную подпись. Ровно та же утечка через путь ошибки,
+    // что была с ключом RP.
+    const text = JSON.stringify(r);
+    for (const field of ['r', 's']) {
+      const v = { ...base, ...patch }[field];
+      if (typeof v === 'string' && v.length > 20) {
+        assert.ok(!text.includes(v.slice(2, 30)), `${name}: значение поля ${field} уехало в отказ`);
+      }
+    }
+    // Форма полей в отказе есть — по ней и чинят, не видя значений.
+    assert.equal(r.detail.fields.length, 3, name);
+  }
+});
+
+test('🔴 a broken digest field does NOT report itself as a broken signature', async () => {
+  // Найдено ботом на PR #25 и подтверждено замером: дайджест и восстановление подписи
+  // стояли в одном try, и порча `requestCID` выдавала `note: signature could not be
+  // read` при трёх идеальных r/s/v (length 66, hex true) — отказ показывал пальцем на
+  // здоровую подпись. Эта проверка умирает вместе с правкой: сведите два try обратно в
+  // один, и stage станет 'signature', а список полей — r,s,v.
+  const base = att('sample1.attestation.json');
+  const body = raw('sample1.body.json');
+
+  // 🔴 `0x` + 64 буквы «Z» здесь не для красоты: до правки этот вход НЕ отказывался
+  // вовсе. viem сверяет у bytes32 размер, а не алфавит, поэтому не-hex проходил
+  // насквозь, менял дайджест и восстанавливал постороннего подписанта — ok:true.
+  const bads = {
+    'не hex, но верной длины': `0x${'Z'.repeat(64)}`,
+    'короткий':               '0xZZ',
+    'без 0x':                 'a'.repeat(64),
+    'пустая строка':          '',
+    'null':                   null,
+    'число':                  5,
+  };
+
+  for (const field of ['requestCID', 'subgraphDeploymentID']) {
+    for (const [name, bad] of Object.entries(bads)) {
+      const label = `${field}/${name}`;
+      const r = await verifyAttestation(body, { ...base, [field]: bad });
+      assert.equal(r.ok, false, `принят негодный вход дайджеста: ${label}`);
+      assert.equal(r.reason, 'attestation_unusable', label);
+      assert.equal(r.detail.stage, 'digest', `${label}: отказ назвал не тот этап`);
+      assert.deepEqual(
+        r.detail.fields.map((f) => f.field),
+        ['requestCID', 'responseCID', 'subgraphDeploymentID'],
+        `${label}: в отказе не входы дайджеста`,
+      );
+      assert.ok(!/signature/i.test(r.detail.note), `${label}: примечание всё ещё про подпись`);
+      if (typeof bad === 'string' && bad.length > 20) {
+        assert.ok(
+          !JSON.stringify(r).includes(bad.slice(2, 30)),
+          `${label}: значение уехало в отказ`,
+        );
+      }
+    }
+  }
+
+  // Обратная половина, без которой проверка была бы зелёной на «всегда stage: digest»:
+  // порча подписи по-прежнему называет ПОДПИСЬ.
+  const sig = await verifyAttestation(body, { ...base, r: `0x${'0'.repeat(64)}` });
+  assert.equal(sig.detail.stage, 'signature');
+  assert.deepEqual(sig.detail.fields.map((f) => f.field), ['r', 's', 'v']);
+
+  // И граница проверки названа замером, а не обещанием: 64 нуля — ЗАКОННЫЙ hex, он
+  // проходит и восстанавливает другого подписанта. Отсекает его цепь (нет аллокации),
+  // а не форма. Если однажды это начнёт отказывать здесь — проверка расширилась молча.
+  const zeros = await verifyAttestation(body, { ...base, requestCID: `0x${'0'.repeat(64)}` });
+  assert.equal(zeros.ok, true, 'законный hex обязан дойти до восстановления подписанта');
+  assert.match(zeros.allocationId, /^0x[0-9a-fA-F]{40}$/);
+  assert.notEqual(
+    zeros.allocationId,
+    (await verifyAttestation(body, base)).allocationId,
+    'другой requestCID обязан дать другого подписанта — иначе дайджест не зависит от входа',
+  );
+});
+
+test('a readable signature still recovers its signer', async () => {
+  // Иначе предыдущая проверка была бы зелёной при «отвергать всё».
+  const r = await verifyAttestation(raw('sample1.body.json'), att('sample1.attestation.json'));
+  assert.equal(r.ok, true, r.reason);
+  assert.match(r.allocationId, /^0x[0-9a-fA-F]{40}$/);
 });
