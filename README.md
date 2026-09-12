@@ -220,15 +220,27 @@ saying so in English before the Russian starts.
 
 ### Permit2, by file and line
 
-🔴 **The boundary first, because two readers in a row have called this an undertone.** What
-is in this repository is the Permit2 **digest**: built from the spec, checked against the
-deployed contract, and reproduced by two implementations that share no code. What is **not**
-in this repository is an enclave that signs a Permit2 message — that needs an action inside
-the image which does not exist, and there is nothing here that would let you run one. The
-signing product is a separate thing, it lives in `namixai/signer`, and it does not sign
-Permit2 either. So: the spec work is ours and it runs; the signature does not exist
-anywhere yet, in the product or here. Anything below that reads as more than that is us
-writing badly, not us having built it.
+🔴 **The boundary first, and a correction to what this file said a few hours ago.** What is
+in **this** repository is the Permit2 **digest**: built from the spec, checked against the
+deployed contract, reproduced by two implementations that share no code. No signing. That
+part has not changed.
+
+What changed is the sentence that followed it. Until today this file also said the signing
+action did not exist in the product either. **That is wrong, and it was wrong when written:**
+`namixai/signer` gained an enclave action `sign_permit2_permit_single` and a gateway route
+`POST /sign/permit2-permit-single` on 10 and 11 September — commits `865f418` and `17faf5a`
+on its `main`, in `poc/enclave/src/signer.rs`, `poc/enclave/src/proto.rs` and
+`poc/gateway/src/handlers.rs`. We asserted the state of another repository without opening
+it. It is corrected here rather than quietly edited out, because a reviewer can find those
+commits in a minute and should not have to wonder which of our sentences to trust.
+
+So the honest three lines:
+
+- **This submission** contains the digest work, and no signing. Nothing here will sign for you.
+- **The product** has the action in its source since 10–11 September.
+- **Nobody can exercise it from what we published:** the demo gateway answers 404 on that
+  route — measured — as it does on `/sign/order`. The demo lane exposes attestation, not
+  signing.
 
 The Uniswap track asks a README to point at the contracts and the lines of code, so here
 they are rather than a directory to go hunting in. Links are pinned to a commit, because a

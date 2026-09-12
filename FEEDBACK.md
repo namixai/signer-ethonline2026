@@ -5,9 +5,18 @@ AWS Nitro enclave that holds an agent's key and applies the owner's policy befor
 signature exists, so our contact with Permit2 is narrow and specific: we construct and check
 the EIP-712 digest, and we needed to be certain it is right before anything signs it. 🔴
 Scoped precisely, added after a review caught the earlier wording overreaching: this document
-covers digest construction and verification only. No Permit2-aware policy code exists in the
-enclave or gateway today, and nothing here signs a Permit2 payload — see "What this document
-does not claim" at the end.
+covers digest construction and verification only, and nothing in the repository it ships with
+signs a Permit2 payload.
+
+🔴 **Corrected 12 September, and worth the paragraph.** This sentence used to say no
+Permit2-aware code existed in our enclave or gateway. That stopped being true on 10–11
+September, and we did not notice because we were describing a second repository from memory
+rather than opening it: `namixai/signer` now carries an enclave action
+`sign_permit2_permit_single` and a gateway route for it. It is not deployed anywhere a reader
+can reach — the public demo answers 404 on that route — so nothing published lets anyone
+exercise it. But "not reachable" and "does not exist" are different claims, and a document
+whose whole value is that its claims are checkable should not blur them. See "What this
+document does not claim" at the end.
 
 Everything below is something we hit while building, with the check we used. Dates and
 addresses are given so a reader can tell what was current: **4 September 2026**.

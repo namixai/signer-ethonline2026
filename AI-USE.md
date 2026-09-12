@@ -11,12 +11,51 @@ first condition; `plans/` and `specs/` cover the third.
 repository it did the work you can see: reading protocol sources, writing the specs,
 implementing both verification paths, and drafting prose.
 
-What it did not do: decide what to build, decide which prize tracks to enter, or merge
-anything. Every pull request is reviewed and merged by a human. Public claims pass a
-separate evidence gate before they are published anywhere.
+What it did not do: decide what to build, decide which prize tracks to enter, decide what
+gets published, or spend money.
 
-Two automated reviewers — CodeRabbit and Gemini Code Assist — comment on pull requests.
-Their findings are accepted, argued with, or rejected with a reason, by a human.
+🔴 **A correction to what this file said until today.** It used to say "Every pull request
+is reviewed and merged by a human", and that every finding from "two automated reviewers —
+CodeRabbit and Gemini Code Assist" was handled by a human. **Both sentences were written to
+fit a compliance template rather than to describe this repository, and both fail the first
+check anyone would run.** Here is that check, as of 12 September, on all 25 pull requests:
+
+- Every pull request is authored by one account, `namixai`, and every merged one was merged
+  by that same account. There is no second party on either side of a merge.
+- Not one review carries the `APPROVED` state. Every review state in the repository is
+  `COMMENTED`.
+- Eleven of the 25 — `#6`, `#7`, `#10` through `#16`, `#19`, `#20` — have no review record
+  at all.
+- Gemini Code Assist has never commented here. The only two participants on any pull
+  request are `coderabbitai[bot]` (111 comments) and `namixai` (34).
+
+**How it actually works, which we would rather be judged on.**
+
+One account carries every commit and every merge, and it belongs to the person whose
+project this is. The work is split across Claude Code sessions, one per area, and a session
+does not merge its own work: a separate coordinating session reads the change, argues with
+it, and decides. That gate is real — it has sent work back, and corrections in this
+repository's history exist because of it — but it is another model session, not a second
+human, and describing it as one would be the same overreach in a longer sentence.
+
+The human decisions are the ones named above: scope, which tracks to enter, what may be
+said in public, and any spending. Every payment behind the measurements in this repository
+was made by hand, by him, after being shown the amount.
+
+**The one automated reviewer, and what it was actually worth.** CodeRabbit comments on pull
+requests here, and its findings are measured before they are accepted. Most were accurate
+and were taken. Two worth naming: on `#17` it caught that a format check accepted `0x00…00`
+and values at or above the secp256k1 group order, so an unusable key reached the signing
+library — the fix, and the reason the refusal has to happen before that call, came out of
+that thread. On `#22` it caught that an empty result was being reported as a saturated
+ceiling.
+
+The honest other half is that a bot finding accepted on authority is not review either. One
+was refused with a reason on the record: it asked for pagination in a query where every
+page is a paid request, a cost not visible from the diff. And one was right about the
+defect while its proposed fix could not work as written — the deadline it suggested never
+reaches the network, because the payment wrapper drops the abort signal it is given; that
+was found by measuring, not by reading the suggestion.
 
 ## How the prompts are published
 
