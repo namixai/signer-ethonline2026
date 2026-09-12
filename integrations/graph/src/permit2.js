@@ -73,6 +73,11 @@ export function permitSingleDigest(permitSingle, chainId = 1n, verifyingContract
  * with the most at stake.
  */
 export const UINT160_MAX = (1n << 160n) - 1n;
+// The other declared widths, from the type strings above:
+//   PermitDetails(address token, uint160 amount, uint48 expiration, uint48 nonce)
+//   PermitSingle(PermitDetails details, address spender, uint256 sigDeadline)
+const UINT48_MAX = (1n << 48n) - 1n;
+const UINT256_MAX = (1n << 256n) - 1n;
 
 export function checkPermitPolicy(permitSingle, policy) {
   // Malformed input is a named refusal, never a throw.
@@ -126,8 +131,39 @@ export function checkPermitPolicy(permitSingle, policy) {
     }
   };
 
+  // 🔴 A RANGE, NOT A LIST OF BAD VALUES — and the sixth way out of a function that
+  // promises none. Every numeric field was converted and then never bounded: a NEGATIVE
+  // amount came back { ok: true } and viem refused one frame below with
+  // IntegerOutOfRangeError. No signature is ever built, so nothing is exploitable — and
+  // that is precisely why it would have stayed: the only symptom is a gate that says yes
+  // and a refusal whose name is lost where nobody can log it.
+  //
+  // Measured before this fix, and WIDER than it was reported: amount, expiration, nonce
+  // AND sigDeadline all returned { ok: true } at -1. Four fields, so the guard is each
+  // field's declared ABI width rather than a `< 0n` test bolted onto the one that was
+  // noticed. Listing paths protects a list; bounding the field protects the property.
+  const ranged = (v, what, max) =>
+    v === null ? `${what} is not an integer`
+      : v < 0n ? `${what} is negative (${v}) and the field is unsigned`
+        : v > max ? `${what} is ${v}, which does not fit its declared width`
+          : null;
+
   const amount = big(details.amount);
-  if (amount === null) return { ok: false, reason: 'bad_request', detail: 'amount is not an integer' };
+  let bad = ranged(amount, 'amount', UINT160_MAX);
+  if (bad) return { ok: false, reason: 'bad_request', detail: bad };
+
+  // Checked here and NOT only under their policy caps: an owner who set no
+  // maxExpiration still must not get a digest built from a field that cannot hold the
+  // value. The cap is a policy question, the width is an arithmetic one.
+  const expiration = big(details.expiration);
+  bad = ranged(expiration, 'expiration', UINT48_MAX);
+  if (bad) return { ok: false, reason: 'bad_request', detail: bad };
+  const nonce = big(details.nonce);
+  bad = ranged(nonce, 'nonce', UINT48_MAX);
+  if (bad) return { ok: false, reason: 'bad_request', detail: bad };
+  const deadline = big(sigDeadline);
+  bad = ranged(deadline, 'sigDeadline', UINT256_MAX);
+  if (bad) return { ok: false, reason: 'bad_request', detail: bad };
 
   // Refused regardless of the cap: an owner with a huge ceiling must not silently
   // lose this guarantee.
@@ -164,17 +200,16 @@ export function checkPermitPolicy(permitSingle, policy) {
   }
   if (!allowedSpenders.includes(spenderAddr)) return { ok: false, reason: 'spender_not_allowed' };
 
+  // The values are already converted and bounded above; only the caps are read here.
   if (policy.maxExpiration !== undefined) {
-    const exp = big(details.expiration), cap = big(policy.maxExpiration);
-    if (exp === null) return { ok: false, reason: 'bad_request', detail: 'expiration is not an integer' };
+    const cap = big(policy.maxExpiration);
     if (cap === null) return { ok: false, reason: 'policy_required', detail: 'maxExpiration is not an integer' };
-    if (exp > cap) return { ok: false, reason: 'expiration_over_cap' };
+    if (expiration > cap) return { ok: false, reason: 'expiration_over_cap' };
   }
   if (policy.maxSigDeadline !== undefined) {
-    const dl = big(sigDeadline), cap = big(policy.maxSigDeadline);
-    if (dl === null) return { ok: false, reason: 'bad_request', detail: 'sigDeadline is not an integer' };
+    const cap = big(policy.maxSigDeadline);
     if (cap === null) return { ok: false, reason: 'policy_required', detail: 'maxSigDeadline is not an integer' };
-    if (dl > cap) return { ok: false, reason: 'sig_deadline_over_cap' };
+    if (deadline > cap) return { ok: false, reason: 'sig_deadline_over_cap' };
   }
   return { ok: true };
 }

@@ -210,3 +210,94 @@ test('🔴 no malformed field escapes as an exception — the contract said so, 
   // and the honest order still passes
   assert.deepEqual(checkPermitPolicy(O, P), { ok: true });
 });
+
+// 🔴 Шестой путь наружу через исключение, и он был ЦЕЛЫМ КЛАССОМ, а не одним полем.
+// Замер до правки: amount, expiration, nonce и sigDeadline — все четыре возвращали
+// { ok: true } на -1, а viem отказывал кадром ниже IntegerOutOfRangeError. Подписи бы
+// не вышло, так что не эксплуатируется; именно поэтому и осталось бы — единственный
+// симптом это гейт, сказавший «да», и имя отказа, потерянное там, где его не залогируешь.
+//
+// Проверка привязана к ШИРИНЕ ПОЛЯ, а не к списку плохих значений: список защищает
+// список, граница защищает свойство.
+test('numeric fields are bounded by their declared ABI width, both ends', () => {
+  const P = {
+    allowedTokens: ['0x1111111111111111111111111111111111111111'],
+    allowedSpenders: ['0x2222222222222222222222222222222222222222'],
+    // Потолки подняты до максимумов полей: иначе граничное значение упрётся в
+    // ПОЛИТИКУ и тест измерит не диапазон, а лимит, который сам же и задал.
+    maxAmount: (1n << 160n) - 1n,
+    maxExpiration: (1n << 48n) - 1n,
+    maxSigDeadline: (1n << 256n) - 1n,
+  };
+  const O = {
+    details: { token: '0x1111111111111111111111111111111111111111', amount: 1n, expiration: 1n, nonce: 0n },
+    spender: '0x2222222222222222222222222222222222222222', sigDeadline: 1n,
+  };
+  const U48 = (1n << 48n) - 1n;
+  const U160 = (1n << 160n) - 1n;
+  const U256 = (1n << 256n) - 1n;
+  const withDetail = (k, v) => ({ ...O, details: { ...O.details, [k]: v } });
+
+  const outOfRange = [
+    ['amount -1', withDetail('amount', -1n)],
+    ['amount 2^160', withDetail('amount', U160 + 1n)],
+    ['expiration -1', withDetail('expiration', -1n)],
+    ['expiration 2^48', withDetail('expiration', U48 + 1n)],
+    ['nonce -1', withDetail('nonce', -1n)],
+    ['nonce 2^48', withDetail('nonce', U48 + 1n)],
+    ['sigDeadline -1', { ...O, sigDeadline: -1n }],
+    ['sigDeadline 2^256', { ...O, sigDeadline: U256 + 1n }],
+  ];
+  for (const [name, order] of outOfRange) {
+    const r = checkPermitPolicy(order, P);
+    assert.equal(r.ok, false, `${name}: гейт сказал «да» значению вне диапазона поля`);
+    assert.equal(r.reason, 'bad_request', name);
+    assert.ok(/negative|declared width/.test(r.detail ?? ''), `${name}: причина не названа`);
+  }
+
+  // Границы, которые обязаны ПРОХОДИТЬ — иначе правка просто запрещает всё подряд.
+  assert.equal(checkPermitPolicy(withDetail('amount', 0n), P).ok, true, 'amount 0');
+  assert.equal(checkPermitPolicy(withDetail('expiration', U48), P).ok, true, 'expiration = uint48 max');
+  assert.equal(checkPermitPolicy(withDetail('nonce', U48), P).ok, true, 'nonce = uint48 max');
+  assert.equal(checkPermitPolicy({ ...O, sigDeadline: U256 }, P).ok, true, 'sigDeadline = uint256 max');
+  // ...а бесконечный allowance остаётся ОТДЕЛЬНЫМ отказом, не «вне диапазона»:
+  // владелец с высоким потолком не должен молча потерять эту гарантию.
+  assert.equal(checkPermitPolicy(withDetail('amount', U160), P).reason, 'infinite_allowance_refused');
+});
+
+// Свойство, а не перечень: ВСЁ, что гейт пропустил, обязано собраться в дайджест без
+// исключения. Это привязывает гейт к самой библиотеке, а не к списку случаев, который
+// я придумал, — если viem завтра ужесточит диапазон, тест покраснеет сам.
+test('anything the gate accepts builds a digest without throwing', () => {
+  const P = {
+    allowedTokens: ['0x1111111111111111111111111111111111111111'],
+    allowedSpenders: ['0x2222222222222222222222222222222222222222'],
+    maxAmount: (1n << 160n) - 1n, maxExpiration: (1n << 48n) - 1n, maxSigDeadline: (1n << 256n) - 1n,
+  };
+  const base = {
+    details: { token: '0x1111111111111111111111111111111111111111', amount: 1n, expiration: 1n, nonce: 0n },
+    spender: '0x2222222222222222222222222222222222222222', sigDeadline: 1n,
+  };
+  const U48 = (1n << 48n) - 1n, U160 = (1n << 160n) - 1n, U256 = (1n << 256n) - 1n;
+  const values = [-1n, 0n, 1n, U48, U48 + 1n, U160 - 1n, U160, U160 + 1n, U256, U256 + 1n];
+  let accepted = 0;
+  for (const field of ['amount', 'expiration', 'nonce']) {
+    for (const v of values) {
+      const order = { ...base, details: { ...base.details, [field]: v } };
+      if (!checkPermitPolicy(order, P).ok) continue;
+      accepted += 1;
+      assert.doesNotThrow(() => permitSingleDigest(order, 1n),
+        `гейт пропустил ${field}=${v}, а дайджест на нём бросает`);
+    }
+  }
+  for (const v of values) {
+    const order = { ...base, sigDeadline: v };
+    if (!checkPermitPolicy(order, P).ok) continue;
+    accepted += 1;
+    assert.doesNotThrow(() => permitSingleDigest(order, 1n),
+      `гейт пропустил sigDeadline=${v}, а дайджест на нём бросает`);
+  }
+  // Растяжка на сам тест: если гейт начнёт отказывать ВСЕМУ, цикл выше станет пустым и
+  // молча зелёным — ровно та тишина, которую мы и ловим.
+  assert.ok(accepted >= 12, `принятых значений всего ${accepted} — проверять было нечего`);
+});
