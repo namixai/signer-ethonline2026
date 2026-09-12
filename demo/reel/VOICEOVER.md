@@ -66,7 +66,7 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 | cue | on screen | SAY |
 |---|---|---|
 | 3:04 | frame 3 header, fresh nonce | "Last, the part that needs nothing from us. No account, no token, no permission." |
-| 3:14 | the five checks, all green | "The service returns a measurement of the code it is running, signed by the hardware — and we open that signature, not the number printed beside it." |
+| 3:14 | the six checks, all green | "The service returns a measurement of the code it is running, signed by the hardware — and we open that signature, not the number printed beside it." |
 | 3:26 | the `cast call` and its answer | "Then the registry on Base: is that measurement active? Read the answer off the screen — it is the chain's, not ours." |
 | 3:37 | the closing lines | "And the check that needs no registry is the one to judge us on: rebuild from the public clone, and compare." |
 

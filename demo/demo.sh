@@ -128,8 +128,15 @@ run_frame_3() {
   nonce=$(python3 -c 'import secrets;print(secrets.token_hex(16))')
   note "fresh nonce: ${nonce}   (the document is bound to it, so a replay is visible)"
 
-  body=$(curl -s -D /tmp/.demo_hdr --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
-  note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
+  # 🔴 A PRIVATE temp file now. The old fixed path under /tmp, in a world-writable
+  # directory, is a pre-created file or a symlink waiting to happen, and two runs of this
+  # script at once quietly read each other's headers. `mktemp` plus a trap costs one line,
+  # and the trap means the cleanup no longer has to be repeated at every `return`.
+  local hdr
+  hdr=$(mktemp -t demo_hdr) || { stub "frame 3 not run — mktemp failed"; return 0; }
+  trap 'rm -f "$hdr"' RETURN
+  body=$(curl -s -D "$hdr" --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
+  note "cache-control: $(grep -i '^cache-control' "$hdr" | tr -d '\r' | cut -d' ' -f2-)"
   note ""
 
   # 🔴 THE PCR0 NOW COMES OUT OF THE SIGNED DOCUMENT, AND IT USED TO NOT.
@@ -167,7 +174,6 @@ run_frame_3() {
       note "registry about a PCR0 we could not authenticate would print a true that means"
       note "nothing."
     fi
-    rm -f /tmp/.demo_hdr
     return 0
   fi
 
@@ -207,7 +213,6 @@ run_frame_3() {
   note "public clone and compare PCR0. That procedure is VERIFY-SIGNER-YOURSELF.md in"
   note "namixai/signer. We do not ask anyone to take the hash on faith — the point of"
   note "the frame is that they do not have to."
-  rm -f /tmp/.demo_hdr
 }
 
 echo "Usenami Signer — demo, run as a script so it can be re-run"

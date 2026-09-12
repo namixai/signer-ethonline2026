@@ -53,6 +53,28 @@ import tempfile
 
 ES384 = -35
 
+# 🔴 THE TRUST ANCHOR, PINNED. Without this the whole file was theatre against the one
+# attacker who matters here: whoever controls the endpoint can mint their own root, sign
+# their own chain, sign a document with any PCR0 they like, echo the nonce and set the
+# mirror to match. Every other check below would go green, `--pcr0-only` would print that
+# PCR0, and frame 3 would ask the registry about a measurement chosen by the attacker.
+# Found by a reviewer on PR #25; the forged-chain case is in test-attest-verify.py and it
+# is a REAL forgery — its own CA, its own ES384 signature — not a stub.
+#
+# What this value is, stated exactly: the SHA-256 of the DER of the root certificate that
+# the documents served by our demo box chain to, recorded 12 September 2026. It is NOT a
+# value we can prove is AWS's from inside this file. Anyone who does not want to take our
+# word for one constant compares it once against AWS's own published root:
+#
+#   curl -sO https://aws-nitro-enclaves.amazonaws.com/AWS_NitroEnclaves_Root-G1.zip
+#   unzip -p AWS_NitroEnclaves_Root-G1.zip > aws-nitro-root
+#   openssl x509 -in aws-nitro-root -outform DER | shasum -a 256
+#
+# After that comparison the pin is theirs rather than ours. Supplying NITRO_ROOT=<file>
+# does the same job per-run: the anchor used is then their file, and it is still required
+# to match this fingerprint, so a wrong file is caught instead of silently trusted.
+NITRO_ROOT_SHA256 = '641a0321a3e244efe456463195d606317ed7cdcc3c1756e09893f3c68f79bb5b'
+
 
 def dec(b, i=0):
     """Minimal CBOR reader: enough for an NSM attestation document, nothing more."""
@@ -121,7 +143,13 @@ def head(mt, n):
         return bytes([mt << 5 | 24, n])
     if n < 0x10000:
         return bytes([mt << 5 | 25]) + n.to_bytes(2, 'big')
-    return bytes([mt << 5 | 26]) + n.to_bytes(4, 'big')
+    if n < 0x1_0000_0000:
+        return bytes([mt << 5 | 26]) + n.to_bytes(4, 'big')
+    # The 8-byte form. Not reachable from the lengths this file encodes, but the
+    # falsification harness builds whole CBOR documents with this helper and an attestation
+    # timestamp in milliseconds does not fit in four bytes — it raised OverflowError, which
+    # is a worse way to find out than a branch.
+    return bytes([mt << 5 | 27]) + n.to_bytes(8, 'big')
 
 
 def sig_structure(protected, payload):
@@ -161,21 +189,71 @@ def main():
         say(f'   could not check: the response is not a readable attestation body ({type(err).__name__})')
         return 2
 
+    # 🔴 EXPLICIT CHECKS, NOT `assert`. Two reasons, both from a reviewer on PR #25:
+    # `python -O` deletes assert statements outright, which would let a malformed document
+    # walk straight into openssl; and this path used to return 1, reporting an unreadable
+    # body as a FAILED verification. A document we cannot parse is a could-not-check about
+    # the input (exit 2), not a verdict on the enclave. Every field openssl or the later
+    # code touches is type- and length-checked here, before anything is handed over.
+    def unreadable(why):
+        say(f'   could not check: {why}')
+        say('   (this is about the document we were handed, not a verdict on the enclave)')
+        return None
+
     checks = {}
     try:
-        sign1, consumed = dec(raw)
-        assert isinstance(sign1, list) and len(sign1) == 4, 'not a 4-item COSE_Sign1'
-        protected, _ = dec(sign1[0])
-        assert protected.get(1) == ES384, f'alg is {protected.get(1)}, expected ES384 ({ES384})'
-        payload, _ = dec(sign1[2])
-        pcr0 = payload['pcrs'][0]
-        assert len(pcr0) == 48, f'PCR0 is {len(pcr0)} bytes, expected 48'
-        checks['cose_parsed'] = True
+        sign1, _consumed = dec(raw)
     except Exception as err:
-        say(f'   🔴 cose_parsed FAILED: {err}')
-        return 1
+        unreadable(f'the body is not CBOR ({type(err).__name__})')
+        return 2
+    if not (isinstance(sign1, list) and len(sign1) == 4):
+        unreadable('not a 4-item COSE_Sign1 array')
+        return 2
+    if not all(isinstance(sign1[i], (bytes, bytearray)) for i in (0, 2, 3)):
+        unreadable('COSE_Sign1 fields 0/2/3 must be byte strings')
+        return 2
+    try:
+        protected, _ = dec(bytes(sign1[0]))
+        payload, _ = dec(bytes(sign1[2]))
+    except Exception as err:
+        unreadable(f'the protected header or payload is not CBOR ({type(err).__name__})')
+        return 2
+    if not isinstance(protected, dict) or protected.get(1) != ES384:
+        alg = protected.get(1) if isinstance(protected, dict) else type(protected).__name__
+        unreadable(f'alg is {alg}, expected ES384 ({ES384})')
+        return 2
+    if not isinstance(payload, dict):
+        unreadable('the payload is not a CBOR map')
+        return 2
+    pcrs = payload.get('pcrs')
+    if not isinstance(pcrs, dict) or not isinstance(pcrs.get(0), (bytes, bytearray)):
+        unreadable('pcrs[0] is missing or is not a byte string')
+        return 2
+    pcr0 = bytes(pcrs[0])
+    if len(pcr0) != 48:
+        unreadable(f'PCR0 is {len(pcr0)} bytes, expected 48 for SHA-384')
+        return 2
+    leaf_der = payload.get('certificate')
+    if not isinstance(leaf_der, (bytes, bytearray)) or len(leaf_der) == 0:
+        unreadable('`certificate` is missing or is not a byte string')
+        return 2
+    bundle = payload.get('cabundle')
+    if not isinstance(bundle, list) or len(bundle) == 0 or not all(
+        isinstance(c, (bytes, bytearray)) and len(c) > 0 for c in bundle
+    ):
+        unreadable('`cabundle` is missing, empty, or is not a list of byte strings')
+        return 2
+    sig = bytes(sign1[3])
+    if len(sig) == 0 or len(sig) % 2 != 0:
+        unreadable(f'the signature is {len(sig)} bytes, which cannot split into r and s')
+        return 2
+    nonce_field = payload.get('nonce')
+    if nonce_field is not None and not isinstance(nonce_field, (bytes, bytearray)):
+        unreadable('`nonce` is present but is not a byte string')
+        return 2
+    checks['cose_parsed'] = True
 
-    doc_nonce = (payload.get('nonce') or b'').hex()
+    doc_nonce = bytes(nonce_field or b'').hex()
     checks['nonce_echoed'] = (want_nonce is not None and doc_nonce == want_nonce)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -187,31 +265,60 @@ def main():
                            input=der, capture_output=True, check=True)
             return j(name)
         try:
-            bundle = payload['cabundle']
-            leaf = der_to_cert(payload['certificate'], 'leaf-cert')
-            doc_root = der_to_cert(bundle[0], 'root-cert')
+            leaf = der_to_cert(bytes(leaf_der), 'leaf-cert')
+            doc_root_der = bytes(bundle[0])
+            doc_root = der_to_cert(doc_root_der, 'root-cert')
             with open(j('chain-certs'), 'wb') as out:
                 for n, der in enumerate(bundle[1:]):
-                    out.write(open(der_to_cert(der, f'chain{n}'), 'rb').read())
-            anchor = os.environ.get('NITRO_ROOT') or doc_root
-            anchored = bool(os.environ.get('NITRO_ROOT'))
-            verify = subprocess.run(
-                ['openssl', 'verify', '-CAfile', anchor, '-untrusted', j('chain-certs'), leaf],
-                capture_output=True, text=True)
+                    out.write(open(der_to_cert(bytes(der), f'chain{n}'), 'rb').read())
+
+            # The anchor actually used, and its fingerprint — whichever it is. A supplied
+            # NITRO_ROOT may be PEM or DER, so openssl converts it back to DER for the
+            # comparison instead of us guessing at the encoding.
+            supplied = os.environ.get('NITRO_ROOT')
+            if supplied:
+                to_der = subprocess.run(['openssl', 'x509', '-in', supplied, '-outform', 'DER'],
+                                        capture_output=True)
+                if to_der.returncode != 0:
+                    to_der = subprocess.run(
+                        ['openssl', 'x509', '-in', supplied, '-inform', 'DER', '-outform', 'DER'],
+                        capture_output=True)
+                if to_der.returncode != 0:
+                    say(f'   could not check: NITRO_ROOT={supplied} is not a readable certificate')
+                    return 2
+                anchor, anchor_der, anchored = supplied, to_der.stdout, True
+            else:
+                anchor, anchor_der, anchored = doc_root, doc_root_der, False
+
+            # 🔴 The check the file was missing. Whatever anchored the chain has to be the
+            # certificate we pinned; otherwise "the chain verifies" only says the attacker
+            # was consistent with themselves.
+            anchor_fp = hashlib.sha256(anchor_der).hexdigest()
+            checks['root_pinned'] = (anchor_fp == NITRO_ROOT_SHA256)
+
+            # `-untrusted` with an EMPTY file makes openssl fail on the file rather than on
+            # the chain, which would print a red that means "your cabundle had no
+            # intermediates" while looking like "this chain is not trusted". Found while
+            # building the forged-chain case, whose bundle is a single root.
+            cmd = ['openssl', 'verify', '-CAfile', anchor]
+            if len(bundle) > 1:
+                cmd += ['-untrusted', j('chain-certs')]
+            verify = subprocess.run(cmd + [leaf], capture_output=True, text=True)
             checks['chain_anchored' if anchored else 'chain_internal'] = (verify.returncode == 0)
             chain_detail = verify.stdout.strip() or verify.stderr.strip()
 
             subprocess.run(['openssl', 'x509', '-inform', 'DER', '-pubkey', '-noout', '-out', j('pubkey')],
-                           input=payload['certificate'], capture_output=True, check=True)
-            open(j('sig.der'), 'wb').write(der_ecdsa(sign1[3]))
-            open(j('ss.bin'), 'wb').write(sig_structure(sign1[0], sign1[2]))
+                           input=bytes(leaf_der), capture_output=True, check=True)
+            open(j('sig.der'), 'wb').write(der_ecdsa(sig))
+            open(j('ss.bin'), 'wb').write(sig_structure(bytes(sign1[0]), bytes(sign1[2])))
             sigv = subprocess.run(
                 ['openssl', 'pkeyutl', '-verify', '-pubin', '-inkey', j('pubkey'),
                  '-sigfile', j('sig.der'), '-rawin', '-digest', 'sha384', '-in', j('ss.bin')],
                 capture_output=True, text=True)
             checks['cose_signature'] = (sigv.returncode == 0)
         except subprocess.CalledProcessError as err:
-            say(f'   could not check: openssl refused an input ({err.stderr[:120]!r})')
+            detail = err.stderr.decode(errors='replace') if isinstance(err.stderr, bytes) else str(err.stderr)
+            say(f'   could not check: openssl refused an input ({detail[:120]!r})')
             return 2
 
     mirror = (body.get('pcr0_sha384') or '').lower()
@@ -245,17 +352,29 @@ def main():
     if not checks['mirror_agrees']:
         say(f'        the JSON field says {mirror or "(absent)"} — the document wins, and this is why we compare')
     say('')
-    if 'chain_internal' in checks:
-        root_der = payload['cabundle'][0]
-        root_fp = subprocess.run(['openssl', 'x509', '-inform', 'DER', '-noout',
-                                  '-fingerprint', '-sha256'],
-                                 input=root_der, capture_output=True)
-        say('   ⚠️ the root above came from the same document, so the chain is self-consistent,')
-        say('      NOT anchored. The one value to get from AWS rather than from us:')
-        say(f'      {root_fp.stdout.decode().strip() or "sha256 unavailable"}')
-        say(f'      sha256(root DER) = {hashlib.sha256(root_der).hexdigest()}')
-        say('      AWS publishes it at aws-nitro-enclaves.amazonaws.com/AWS_NitroEnclaves_Root-G1.zip')
-        say('      Set NITRO_ROOT=<that file> and this line becomes chain_anchored.')
+    if not checks['root_pinned']:
+        say('   🔴 THE ANCHOR IS NOT THE CERTIFICATE WE PINNED, so nothing else on this list')
+        say('      means very much: a chain can be perfectly consistent with a root the')
+        say('      attacker minted. Expected and actual, in full, because this is the one')
+        say('      line worth reading character by character:')
+        say(f'      pinned: {NITRO_ROOT_SHA256}')
+        say(f'      actual: {anchor_fp}')
+    elif anchored:
+        say('   the chain is anchored to the certificate YOU supplied via NITRO_ROOT, and')
+        say('   that certificate matches the pinned fingerprint. This is the strongest')
+        say('   form this check takes without leaving the machine.')
+    else:
+        say('   the chain is anchored to the root inside the document, and that root matches')
+        say('   a fingerprint THIS REPOSITORY SHIPS. That defeats a forged chain — an')
+        say('   attacker cannot produce a different certificate with this hash — but the')
+        say('   fingerprint itself is still ours until you check it once against AWS:')
+        say('')
+        say('      curl -sO https://aws-nitro-enclaves.amazonaws.com/AWS_NitroEnclaves_Root-G1.zip')
+        say('      unzip -p AWS_NitroEnclaves_Root-G1.zip > aws-nitro-root')
+        say('      openssl x509 -in aws-nitro-root -outform DER | shasum -a 256')
+        say('')
+        say(f'      expect: {NITRO_ROOT_SHA256}')
+        say('      Then NITRO_ROOT=aws-nitro-root here, and the line above says chain_anchored.')
     return 0 if all(checks.values()) else 1
 
 

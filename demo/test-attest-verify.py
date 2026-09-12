@@ -39,6 +39,18 @@ body = json.loads(FIXTURE.read_text())
 meta = json.loads(META.read_text())
 NONCE = meta['nonce']
 
+def must(condition, why):
+    """A guard that survives `python -O`.
+
+    Every `MUTATION DID NOT APPLY` check below is one of these. As `assert` they vanished
+    under `-O`, and a harness whose mutation-guards are gone prints green while testing
+    nothing — the precise failure this file exists to prevent, one level up.
+    """
+    if not condition:
+        print(f'  🔴 {why}')
+        sys.exit(1)
+
+
 failures = []
 
 
@@ -103,25 +115,127 @@ payload_bstr = sign1[2]
 payload, _ = av.dec(payload_bstr)
 pcr0 = payload['pcrs'][0]
 at = payload_bstr.find(pcr0)
-assert at != -1, 'MUTATION DID NOT APPLY: PCR0 not found in the payload bytes'
+must(at != -1, 'MUTATION DID NOT APPLY: PCR0 not found in the payload bytes')
 flipped = bytearray(payload_bstr)
 flipped[at] ^= 0x01
-assert bytes(flipped) != payload_bstr, 'MUTATION DID NOT APPLY: payload unchanged'
+must(bytes(flipped) != payload_bstr, 'MUTATION DID NOT APPLY: payload unchanged')
 tampered = rebuilt(bytes(flipped))
 check, _ = av.dec(base64.b64decode(tampered['attestation_doc_b64']))
 p2, _ = av.dec(check[2])
-assert p2['pcrs'][0] != pcr0, 'MUTATION DID NOT APPLY: PCR0 survived the flip'
+must(p2['pcrs'][0] != pcr0, 'MUTATION DID NOT APPLY: PCR0 survived the flip')
 case('one flipped bit in PCR0', ['cose_signature', 'mirror_agrees'], tampered)
 
 # ── 2. a nonce we never sent ──
-assert NONCE != '00' * 16
+must(NONCE != '00' * 16, 'MUTATION DID NOT APPLY: the real nonce IS all zeros')
 case('a nonce we never sent', ['nonce_echoed'], body, nonce='00' * 16)
 
 # ── 3. only the JSON mirror field is moved ──
 moved = dict(body)
 moved['pcr0_sha384'] = '00' + body['pcr0_sha384'][2:]
-assert moved['pcr0_sha384'] != body['pcr0_sha384'], 'MUTATION DID NOT APPLY: mirror unchanged'
+must(moved['pcr0_sha384'] != body['pcr0_sha384'], 'MUTATION DID NOT APPLY: mirror unchanged')
 case('only the JSON mirror moved', ['mirror_agrees'], moved)
+
+# ── 3b. 🔴 A REAL FORGED CHAIN. This is the case the pinned root exists for. ──
+#
+# The attacker here controls the endpoint. They mint their own CA with AWS's own subject
+# name, sign an intermediate and a leaf under it, build a complete NSM-shaped document
+# that CLAIMS THE REAL REGISTERED PCR0, echo the nonce we asked for, set the mirror field
+# to match, and sign the COSE Sig_structure properly with their leaf key. Everything is
+# genuine except whose key it is.
+#
+# Before the pin, every check went green and `--pcr0-only` handed that PCR0 to the
+# registry — which would answer `true`, because the measurement is really registered. The
+# frame would have shown a stranger's document passing as ours. Five of the six checks
+# still pass; `root_pinned` is the one that bites.
+#
+# The forgery is built here rather than committed: no key material in the repository, and
+# a fresh chain each run.
+def forge(tmp, pcr0, nonce, timestamp):
+    def run(*args, **kw):
+        return subprocess.run(['openssl', *args], capture_output=True, check=True, **kw).stdout
+    k = lambda n: str(pathlib.Path(tmp) / n)
+    for name in ('rootkey', 'interkey', 'leafkey'):
+        run('ecparam', '-name', 'secp384r1', '-genkey', '-noout', '-out', k(name))
+    run('req', '-new', '-x509', '-key', k('rootkey'), '-sha384', '-days', '365',
+        '-out', k('rootcert'), '-subj', '/C=US/O=Amazon/OU=AWS/CN=aws.nitro-enclaves')
+    pathlib.Path(k('ext')).write_text(
+        'basicConstraints=critical,CA:TRUE\nkeyUsage=critical,digitalSignature,keyCertSign\n')
+    run('req', '-new', '-key', k('interkey'), '-sha384', '-out', k('intercsr'),
+        '-subj', '/C=US/O=Amazon/OU=AWS/CN=forged.us-east-1.aws.nitro-enclaves')
+    run('x509', '-req', '-in', k('intercsr'), '-CA', k('rootcert'), '-CAkey', k('rootkey'),
+        '-sha384', '-days', '365', '-extfile', k('ext'), '-out', k('intercert'))
+    run('req', '-new', '-key', k('leafkey'), '-sha384', '-out', k('leafcsr'),
+        '-subj', '/C=US/O=Amazon/OU=AWS/CN=i-forged-enc0000.us-east-1.aws')
+    run('x509', '-req', '-in', k('leafcsr'), '-CA', k('intercert'), '-CAkey', k('interkey'),
+        '-sha384', '-days', '365', '-out', k('leafcert'))
+    der = lambda n: run('x509', '-in', k(n), '-outform', 'DER')
+
+    def enc(o):
+        if isinstance(o, bool):
+            return bytes([0xF5 if o else 0xF4])
+        if o is None:
+            return b'\xF6'
+        if isinstance(o, int):
+            return av.head(0, o) if o >= 0 else av.head(1, -1 - o)
+        if isinstance(o, (bytes, bytearray)):
+            return av.head(2, len(o)) + bytes(o)
+        if isinstance(o, str):
+            return av.head(3, len(o.encode())) + o.encode()
+        if isinstance(o, list):
+            return av.head(4, len(o)) + b''.join(enc(x) for x in o)
+        if isinstance(o, dict):
+            return av.head(5, len(o)) + b''.join(enc(a) + enc(b) for a, b in o.items())
+        raise TypeError(type(o))
+
+    payload = {
+        'module_id': 'i-forged-enc0000',
+        'digest': 'SHA384',
+        'timestamp': timestamp,
+        'pcrs': {i: (pcr0 if i == 0 else bytes(48)) for i in range(16)},
+        'certificate': der('leafcert'),
+        'cabundle': [der('rootcert'), der('intercert')],
+        'public_key': None,
+        'user_data': None,
+        'nonce': nonce,
+    }
+    payload_bstr, prot = enc(payload), enc({1: av.ES384})
+    pathlib.Path(k('ss')).write_bytes(av.sig_structure(prot, payload_bstr))
+    der_sig = run('dgst', '-sha384', '-sign', k('leafkey'), k('ss'))
+    i, parts = (2 if der_sig[1] < 0x80 else 2 + (der_sig[1] & 0x7F)), []
+    for _ in range(2):
+        ln = der_sig[i + 1]
+        parts.append(der_sig[i + 2:i + 2 + ln].lstrip(b'\x00').rjust(48, b'\x00'))
+        i += 2 + ln
+    raw_sig = b''.join(parts)
+    cose = (av.head(4, 4) + av.head(2, len(prot)) + prot + b'\xa0'
+            + av.head(2, len(payload_bstr)) + payload_bstr + av.head(2, len(raw_sig)) + raw_sig)
+    return {'attestation_doc_b64': base64.b64encode(cose).decode(),
+            'pcr0_sha384': pcr0.hex(), 'timestamp_ms': timestamp}
+
+
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    real_pcr0 = bytes.fromhex(meta['pcr0'])
+    forged = forge(tmp, real_pcr0, bytes.fromhex(NONCE), 1789204297092)
+    code, states = run(forged)
+    green = [n for n, ok in states.items() if ok]
+    if states.get('root_pinned') is not False:
+        failures.append('forged chain: root_pinned did not go red — the pin is not doing its job')
+    elif not all(states.get(c) for c in ('cose_parsed', 'nonce_echoed', 'cose_signature',
+                                         'mirror_agrees', 'chain_internal')):
+        # If the forgery fails for some OTHER reason, this case stops testing the pin and
+        # starts testing the forgery. That has to be loud, not convenient.
+        failures.append(f'forged chain: it failed somewhere else too, so the pin was not what '
+                        f'caught it: {states}')
+    else:
+        out = subprocess.run([sys.executable, str(VERIFY), '--nonce', NONCE, '--pcr0-only'],
+                             input=json.dumps(forged), capture_output=True, text=True)
+        if out.stdout.strip():
+            failures.append('forged chain: --pcr0-only printed the attacker\'s PCR0')
+        else:
+            print(f'  ok   a REAL forged chain claiming the registered PCR0 -> red: root_pinned '
+                  f'(everything else green: {", ".join(sorted(green))}; exit {code}), '
+                  f'and --pcr0-only stayed silent')
 
 # ── 4. an unreadable body is a could-not-check, never a failure ──
 proc = subprocess.run([sys.executable, str(VERIFY), '--nonce', NONCE],
