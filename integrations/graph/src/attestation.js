@@ -149,15 +149,48 @@ export async function verifyAttestation(rawBody, attestation, network = GRAPH_NE
     };
   }
 
-  const digest = receiptDigest(attestation, network);
-  const allocationId = await recoverAddress({
-    hash: digest,
-    signature: {
-      r: attestation.r,
-      s: attestation.s,
-      v: BigInt(normaliseV(attestation.v)),
-    },
-  });
+  // 🔴 КРИВАЯ ПОДПИСЬ — ЭТО ОТКАЗ ПО ИМЕНИ, А НЕ ПАДЕНИЕ. Всё, что выше, отказывало
+  // аккуратно, а этот блок бросал: посторонний, проходивший поверхность 12.09, ломал
+  // подпись руками — и видел стектрейс вместо нашего отказа. Замер: из одиннадцати
+  // рукотворных порч ВОСЕМЬ бросали — не-hex символ, отсутствие `0x`, пустая строка,
+  // нули, двойная длина, отсутствующее поле, мусорный и строковый `v`.
+  //
+  // Именно здесь это дороже всего: у нас семьдесят два кода отказа и отдельный словарь,
+  // отличающий «ответа нет» от «не смог спросить», и всё это обесценивается одним
+  // стектрейсом на том шаге, который судья ломает первым.
+  //
+  // 🔴 И сообщение библиотеки НЕ ПЕРЕДАЁТСЯ НАРУЖУ: viem печатает отвергнутый скаляр
+  // целиком, то есть испорченную подпись — ровно та же утечка через путь ошибки, что
+  // была с ключом RP. Наружу идёт имя поля, длина и ничего больше.
+  let digest;
+  let allocationId;
+  try {
+    digest = receiptDigest(attestation, network);
+    allocationId = await recoverAddress({
+      hash: digest,
+      signature: {
+        r: attestation.r,
+        s: attestation.s,
+        v: BigInt(normaliseV(attestation.v)),
+      },
+    });
+  } catch (err) {
+    const shape = (name, v) => ({
+      field: name,
+      type: typeof v,
+      length: typeof v === 'string' ? v.length : null,
+      hex: typeof v === 'string' ? /^0x[0-9a-fA-F]*$/.test(v) : false,
+    });
+    return {
+      ok: false,
+      reason: 'attestation_unusable',
+      // Что не сошлось — по форме полей, без их значений.
+      detail: {
+        fields: ['r', 's', 'v'].map((f) => shape(f, attestation[f])),
+        note: 'signature could not be read; the library message is withheld because it quotes the value back',
+      },
+    };
+  }
 
   return {
     ok: true,

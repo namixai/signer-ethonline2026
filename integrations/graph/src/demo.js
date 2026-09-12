@@ -23,6 +23,20 @@ import { buildSnapshot, judgeOrder } from './snapshot.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const fx = (n) => readFileSync(join(here, '..', 'test', 'fixtures', n), 'utf8');
 
+// Читает записанную аттестацию и НЕ падает, если её испортили. Форма отказа такая же,
+// как у verifyAttestation, поэтому вызывающему всё равно, на каком шаге не сошлось.
+const readAttestation = (name) => {
+  try {
+    return parseAttestationHeader(fx(name));
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'attestation_header_unreadable',
+      detail: { fixture: name, note: String(err?.message ?? err).slice(0, 80) },
+    };
+  }
+};
+
 // Deliberate presentation pacing for the video recording — NOT simulated latency.
 // Zero by default, so tests and CI are untouched; the real network calls below take
 // exactly as long as they take either way.
@@ -46,8 +60,12 @@ if (q.ok) {
 
 await step(2, 'The answer carries the indexer\u2019s signature. We check it over the EXACT bytes.');
 const body1 = fx('live-2026-09-04.body.json').trim();
-const att1 = parseAttestationHeader(fx('live-2026-09-04.attestation.json'));
-const v1 = await verifyAttestation(body1, att1);
+// 🔴 РАЗБОР ЗАГОЛОВКА БРОСАЕТ ПО КОНТРАКТУ, и три теста это утверждают, — поэтому
+// ловим здесь, а не меняем его. Это тот файл, который посторонний правит руками: он
+// переворачивает разряд в подписи и запускает демо. Отказ по имени он увидеть должен,
+// стектрейс — нет. Найдено вторым проходом постороннего 12.09.
+const att1 = readAttestation('live-2026-09-04.attestation.json');
+const v1 = att1.ok === false ? att1 : await verifyAttestation(body1, att1);
 say('responseCID matched:', v1.ok);
 say('recovered allocation address:', v1.allocationId);
 
@@ -82,7 +100,8 @@ say(`same answer, TSLAon \u2192 REFUSED: ${uZero.reason}`);
 say('zero is legitimate for a long-tail token and useless as a reference — refuse, not "free".');
 
 const body2 = fx('sample2.body.json');
-const v2 = await verifyAttestation(body2, parseAttestationHeader(fx('sample2.attestation.json')));
+const att2 = readAttestation('sample2.attestation.json');
+const v2 = att2.ok === false ? att2 : await verifyAttestation(body2, att2);
 const u2 = checkUsable(JSON.parse(body2), 'WETH', CHAIN_HEAD);
 say(`sample 2 \u2192 signature verified: ${v2.ok}, but the data: REFUSED — ${u2.reason}`);
 say('a paid, correctly attested answer WITH AN ERROR AND NO DATA.');

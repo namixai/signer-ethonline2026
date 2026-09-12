@@ -162,6 +162,18 @@ export async function measureLeverage({
   const paidRun = results.some((r) => r.mode === 'paid');
   const sampledCount = results.filter((r) => r.sampled).length;
 
+  // 🔴 НАБЛЮДЁННОЕ ПОЛЕ И ПРИГОДНАЯ ЦЕНА — РАЗНЫЕ ВЕЩИ, и рядом они путаются. Клейм
+  // leverage про ЗАПРОС и СХЕМУ, а не про цену, и он верен при нулевой цене тоже. Но в
+  // строках результата печатается `topPriceUSD`, и читатель, увидев «поле наблюдалось»
+  // вместе с сильным клеймом, достраивает то, чего здесь не проверяли. Второй проход
+  // постороннего 12.09: на `uniswap-v3-base` пришёл свежий JitoSOL с ценой ноль, и
+  // прогон читался как «купили ноль за цент». Поэтому пригодность считается и называется
+  // ОТДЕЛЬНО — она не усиливает и не ослабляет клейм, она не даёт его додумать.
+  const priced = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
+  const sampledRows = results.filter((r) => r.sampled);
+  const usablePriceRows = sampledRows.filter((r) => priced(r.topPriceUSD)).length;
+  const zeroPriceRows = sampledRows.length - usablePriceRows;
+
   return {
     // 🔴 The summary must not read stronger than the run. In free mode every per-result
     // line says a price challenge proves nothing, but a reader skimming the top would
@@ -180,7 +192,9 @@ export async function measureLeverage({
             ? 'deployments answered, but the request bytes were NOT attested identical — leverage not demonstrated'
             : sampledCount === 0
               ? 'the shared query was honoured everywhere and the request bytes are attested identical, but NO deployment returned a row — no field was actually observed'
-              : 'one query, several deployments of the shared schema, identical requestCID attested by independent indexers')
+              : usablePriceRows === 0
+                ? 'one query, several deployments of the shared schema, identical requestCID attested by independent indexers — AND NOT ONE observed row carried a usable price, so nothing here says a price was bought'
+                : 'one query, several deployments of the shared schema, identical requestCID attested by independent indexers')
       : 'NOTHING about the data: only that the gateway prices this query for these ids. A fabricated id returns the same challenge (measured).',
     checked,
     oneQuery,
@@ -188,6 +202,10 @@ export async function measureLeverage({
     attestedSameRequest,
     attestedRequestCID: attestedSameRequest ? cids[0] : null,
     attestationsCompared: cids.length,
+    // Сколько наблюдённых строк несли цену, которой можно пользоваться. Ноль здесь не
+    // отменяет клейм выше и не подтверждает его: он про то, что цена НЕ наблюдалась.
+    usablePriceRows,
+    zeroPriceRows,
     schema: 'Messari Standardized Subgraph — DEX AMM (Extended)',
     registry: 'https://github.com/messari/subgraphs/blob/master/deployment/deployment.json',
     docs: 'https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/',
