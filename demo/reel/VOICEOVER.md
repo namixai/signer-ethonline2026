@@ -30,7 +30,7 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 | 0:51 | `staked indexer: 0x…` | "And we ask the chain who that signer is. A staked indexer, with the allocation for this exact subgraph. `[cut]` The enclave itself cannot do this — it has no network." |
 | 1:09 | step 4, `same answer, TSLAon → REFUSED` | "Now the part that does not follow. A verified signature does not mean you got a price. Same answer, same attestation, three tokens priced zero. Legitimate — and useless as a reference. So we refuse." |
 | 1:26 | step 5, stale price | "Here is the trap. The head is fresh; the price is a year old. Prices are written in event handlers, so a dead market keeps a dead price under green indexing. Two ages, measured apart." |
-| 1:43 | step 6, band and REFUSED | "Then the decision. A snapshot, signed verbatim, that states what we did **not** check as well as what we did. An honest price passes. A price twice that is refused." |
+| 1:43 | step 6, band and REFUSED | "Then the decision. A snapshot canonical to the byte — the exact text an enclave would sign, though nothing here signs it — stating what we did **not** check as well as what we did. An honest price passes; twice that, refused." |
 | 2:00 | step 7, the gate | "And the gate. An agent with no registered human behind it gets no signature. A change of behaviour, not a log line. `[cut]` And 'no human' is not 'we could not ask'. Different reasons, because the fix is different." |
 | 2:17 | step 8, the boundary | "One boundary, said out loud: all of this runs outside the enclave, before a signature is requested. We do not claim the enclave did it." |
 | 2:35 | screen holds | *(silence — let the last frame sit)* |
@@ -41,25 +41,53 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 |---|---|---|
 | 2:42 | `npm run leverage` output, then the JSON | "The subgraph we read is a Messari Standardized Subgraph. We did not pick it for the prize; we were already on it and did not know. The same query, unchanged, runs on other chains. The part we cannot fake: two independent indexers attested the same request digest. They say so, not us." |
 
-## Act 3 — a stranger checks the running enclave (3:04 – 3:37)
+## Act 3 — a stranger checks the running enclave (3:04 – 3:47)
 
 | cue | on screen | SAY |
 |---|---|---|
-| 3:04 | frame 3 header, nonce | "Last, the part that needs nothing from us. No account, no token, no permission." |
-| 3:14 | `pcr0_sha384`, attestation doc | "The service returns a measurement of the code it is running, signed by the hardware." |
-| 3:22 | the `cast call`, `false`, then the closing lines | "Ask the registry on Base whether it is active. Right now it says false — one active measurement per owner, and another lane holds it. We would rather show you that than hide it. And the check that needs no registry is the one to judge us on: rebuild from the public clone, and compare." |
+| 3:04 | frame 3 header, fresh nonce | "Last, the part that needs nothing from us. No account, no token, no permission." |
+| 3:14 | the five checks, all green | "The service returns a measurement of the code it is running, signed by the hardware — and we open that signature, not the number printed beside it." |
+| 3:26 | the `cast call` and its answer | "Then the registry on Base: is that measurement active? Read the answer off the screen — it is the chain's, not ours." |
+| 3:37 | the closing lines | "And the check that needs no registry is the one to judge us on: rebuild from the public clone, and compare." |
 
 ---
+
+## Measuring the pace instead of feeling it
+
+The reel is 3:47. Every block below fits at a comfortable read, and that is a measurement,
+not an impression:
+
+```bash
+python3 demo/reel/check-pace.py demo/reel/VOICEOVER.md 145 227
+```
+
+145 words per minute is the ceiling, 227 is the reel in seconds — pass it, or the last
+block gets an invented window and the last block is where a script overruns. As of
+12 September: 434 words over 227 seconds, 115 words per minute, zero blocks over the
+limit. The 3:22 block used to run at 216, which is not a read, it is a sprint.
 
 ## If a block will not fit
 
 Cut in this order, and stop as soon as it fits: every `[cut]` line, then the second sentence
-of Act 2's first block, then Act 3's 2:24 block entirely. Do **not** cut the boundary line at
-2:17 or the `false` explanation at 3:22 — those two are the honesty of the whole reel, and a
+of Act 2's first block, then the 3:26 registry block — the screen carries that one on its
+own. Do **not** cut the boundary line at 2:17, the "not the number printed beside it" clause
+at 3:14, or the rebuild line at 3:37. Those three are the honesty of the whole reel, and a
 reel that drops them is selling something else.
+
+🔴 An earlier version of this list named "Act 3's 2:24 block", and Act 3 has never had a
+2:24 block. It also protected a line that said the registry answers `false`; the registry
+answers what it answers on the day, and the reel now tells the viewer to read it rather
+than predicting it out loud.
 
 ## What is deliberately not said
 
 - No "the enclave refused because the price was bad." The band is computed outside.
 - No "Signer signs Permit2." There is no enclave action for it yet.
 - No "attested market data." The indexer signs **what it answered**, not that it is true.
+- No "signed snapshot." The snapshot is canonical and signable; the signing key lives in an
+  enclave this submission does not carry, and `integrations/graph/package.json` says so in
+  its own description. An earlier take of the 1:43 line said "signed verbatim" — three
+  words that would have claimed the one thing we do not do here.
+- No prediction of the registry's answer. Frame 3 reads it live; a script that says the
+  answer in advance is a script that can be wrong on camera, and on 12 September the old
+  line already was — it said `false`, and the chain said `true`.

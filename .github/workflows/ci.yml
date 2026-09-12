@@ -37,6 +37,23 @@ jobs:
       - name: hygiene gate
         run: ./scripts/scrub-check.sh
 
+  attestation:
+    # The verifier that reads PCR0 out of the SIGNED attestation document, and the
+    # falsifications that prove each of its named checks can go red. No network: the
+    # fixture is a production extract, and the mutations are applied to it in place.
+    # `chain_internal` is deliberately not asserted here — Nitro leaf certificates are
+    # short-lived, so a stored document's chain expires on its own schedule and a test
+    # that asserted it would go red on a calendar rather than on a defect. The harness
+    # says so itself, in the file, next to the assertion it does not make.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: every named attestation check must be able to go red
+        run: python3 demo/test-attest-verify.py
+
   vectors:
     runs-on: ubuntu-latest
     steps:

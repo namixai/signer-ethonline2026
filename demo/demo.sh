@@ -124,21 +124,52 @@ run_frame_3() {
   note "Nothing here needs an account, a token, or our permission. This is the frame"
   note "the whole product rests on, and it is the only one that works for anyone today."
 
-  local nonce doc
+  local nonce body
   nonce=$(python3 -c 'import secrets;print(secrets.token_hex(16))')
   note "fresh nonce: ${nonce}   (the document is bound to it, so a replay is visible)"
 
-  doc=$(curl -s -D /tmp/.demo_hdr --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
-  local pcr0
-  pcr0=$(printf '%s' "$doc" | python3 -c '
-import sys,json
-d=json.load(sys.stdin)
-print("   pcr0_sha384        :", d.get("pcr0_sha384"), file=sys.stderr)
-print("   attestation_doc    : <%d chars of NSM-signed COSE> (not printed)" % len(d.get("attestation_doc_b64") or ""), file=sys.stderr)
-print(d.get("pcr0_sha384") or "")
-')
+  body=$(curl -s -D /tmp/.demo_hdr --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
   note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
   note ""
+
+  # 🔴 THE PCR0 NOW COMES OUT OF THE SIGNED DOCUMENT, AND IT USED TO NOT.
+  #
+  # This block read `pcr0_sha384` from the JSON body and handed that to the registry. That
+  # field is written by our own gateway. So the one step this frame rests on compared a
+  # number we typed against a registration we made, while the hardware signature sat in
+  # `attestation_doc_b64` with only its LENGTH printed and its bytes never opened. The
+  # frame claimed "a stranger checks the running code themselves", and at that step it
+  # was not true. The nonce was in the same condition: the line above says the document
+  # is bound to it, and nothing checked that either.
+  #
+  # attest-verify.py opens the COSE document: ES384 over the COSE Sig_structure against
+  # the leaf certificate, the certificate chain, and the nonce inside the document
+  # against the one we just sent. The JSON field becomes a CROSS-CHECK that can go red
+  # rather than the source of the answer. If any check fails it prints no PCR0 and the
+  # registry is not asked — a document we could not authenticate must not be able to
+  # fetch itself a `true`.
+  printf '%s' "$body" | python3 "$HERE/attest-verify.py" --nonce "${nonce}"
+  local pcr0 verdict
+  pcr0=$(printf '%s' "$body" | python3 "$HERE/attest-verify.py" --nonce "${nonce}" --pcr0-only 2>/dev/null)
+  verdict=$?
+  note ""
+  if [ -z "$pcr0" ]; then
+    # 🔴 A could-not-check is not a false, and the two must not print the same sentence.
+    # Conflating them is how a missing openssl turns into "the enclave failed", and how a
+    # real failure hides behind "probably just tooling".
+    if [ "$verdict" = "2" ]; then
+      stub "could not check the document here — this is NOT a verdict on the enclave"
+      note "The verifier needs openssl and a readable body; one of those was missing. The"
+      note "registry is not asked, because the PCR0 to ask about was never authenticated."
+    else
+      stub "the document DID NOT VERIFY — the registry is NOT being asked"
+      note "A red check above is this frame's answer, not a reason to skip it. Asking the"
+      note "registry about a PCR0 we could not authenticate would print a true that means"
+      note "nothing."
+    fi
+    rm -f /tmp/.demo_hdr
+    return 0
+  fi
 
   # 🔴 This comment used to say we deliberately do not print `registered_onchain` from the
   # response. Measured against the live endpoint on 12.09, the response carries exactly
