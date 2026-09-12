@@ -7,6 +7,25 @@ import { decodeChallenge, quote, paidQuery, priceQueryByAddress, priceQueryBySym
 
 // The real challenge, captured from the live gateway on 2026-09-01 (free — reading a
 // 402 costs nothing).
+// Тот же вызов на оплату, но собранный здесь — его используют три стуба ниже. Держать
+// три копии одного челленджа значит чинить порчу в одной и не заметить в двух.
+const CHALLENGE_B64 = Buffer.from(
+  JSON.stringify({
+    x402Version: 2,
+    accepts: [
+      {
+        scheme: 'exact',
+        network: 'eip155:8453',
+        amount: '10000',          // $0.01 в атомарных единицах USDC
+        payTo: '0x79DC34E41B2b591078d3dE222C43EcaaBD52FcCB',
+        maxTimeoutSeconds: 300,
+        asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        extra: { assetTransferMethod: 'eip3009', name: 'USD Coin', version: '2' },
+      },
+    ],
+  }),
+).toString('base64');
+
 const LIVE_CHALLENGE =
   'eyJ4NDAyVmVyc2lvbiI6MiwiZXJyb3IiOiJQYXltZW50LVNpZ25hdHVyZSBoZWFkZXIgaXMgcmVxdWlyZWQiLCJyZXNvdXJjZSI6eyJ1cmwiOiJodHRwOi8vbWFpbm5ldC10aGVncmFwaC1hcmJpdHJ1bS0wNi1ldS1jZW50cmFsMi50aGVncmFwaC5jb20vc3ViZ3JhcGhzL2lkLzRjS3k2UVFNYzV0cGZkeDh5eGZZZWI5VExabWdMUWU0NGRkVzFHN053a0E2In0sImFjY2VwdHMiOlt7InNjaGVtZSI6ImV4YWN0IiwibmV0d29yayI6ImVpcDE1NTo4NDUzIiwiYW1vdW50IjoiMTAwMDAiLCJwYXlUbyI6IjB4NzlEQzM0RTQxQjJiNTkxMDc4ZDNkRTIyMkM0M0VjYWFCRDUyRmNDQiIsIm1heFRpbWVvdXRTZWNvbmRzIjozMDAsImFzc2V0IjoiMHg4MzM1ODlmQ0Q2ZURiNkUwOGY0YzdDMzJENGY3MWI1NGJkQTAyOTEzIiwiZXh0cmEiOnsiYXNzZXRUcmFuc2Zlck1ldGhvZCI6ImVpcDMwMDkiLCJuYW1lIjoiVVNEIENvaW4iLCJ2ZXJzaW9uIjoiMiJ9fV19';
 
@@ -87,9 +106,12 @@ test('a malformed payer key is refused by name, before any payment attempt', asy
   assert.equal(r.reason, 'bad_payer_key');
 });
 
-test('a failed paid request reports that the spend is UNKNOWN, not that it did not happen', async () => {
-  // The honest direction: a throw may mean the payment never went out, or that it did
-  // and the response was lost. Recording it as "no spend" would be a guess.
+// 🔴 ЭТОТ ТЕСТ РАНЬШЕ ТРЕБОВАЛ spendUnknown: true — и требовал неправды. Обрыв на
+// ПЕРВОМ, неоплаченном запросе: 402 ещё не пришёл, payload не собран, подписи нет.
+// Про этот случай известно точно, что денег не ушло. «Иди смотри цепь» здесь учит не
+// смотреть, потому что приходит на каждом прогоне, и флаг обесценивается ровно тогда,
+// когда он нужен. Признак структурный: ушёл ли в провод заголовок X-PAYMENT.
+test('a failure BEFORE any payment header is spend-KNOWN, not unknown', async () => {
   const r = await paidQuery({
     privateKey: '0x' + '11'.repeat(32),
     fetchImpl: async () => {
@@ -98,7 +120,52 @@ test('a failed paid request reports that the spend is UNKNOWN, not that it did n
   });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'paid_request_failed');
-  assert.equal(r.spendUnknown, true);
+  assert.equal(r.spendUnknown, false, 'ничего не ушло в провод — тут нечего не знать');
+});
+
+test('a failure AFTER the payment header went out stays UNKNOWN', async () => {
+  // Единственный честно неоднозначный случай: платёж мог дойти, а ответ потеряться.
+  // Записать его как «не потрачено» было бы догадкой, и вот здесь флаг настоящий.
+  let calls = 0;
+  const r = await paidQuery({
+    privateKey: '0x' + '11'.repeat(32),
+    fetchImpl: async (input, init) => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response('', { status: 402, headers: { 'payment-required': CHALLENGE_B64 } });
+      }
+      throw new Error('connection reset after the payment left');
+    },
+  });
+  assert.equal(calls, 2, 'платёж обязан был уйти вторым вызовом');
+  assert.equal(r.ok, false);
+  assert.equal(r.spendUnknown, true, 'платёж ушёл и ответ потерян — это и есть «не знаю»');
+});
+
+test('a spend-control refusal is named, and it is NOT spend-unknown', async () => {
+  // Потолок режет ДО того, как payload вообще собран. Раньше это приходило как
+  // paid_request_failed + spendUnknown:true, то есть отправляло читателя искать в
+  // обозревателе блоков платёж, которого никогда не было.
+  const prev = process.env.X402_MAX_PER_PAYMENT;
+  process.env.X402_MAX_PER_PAYMENT = '$0.000001';   // запрос стоит $0.01
+  try {
+    let calls = 0;
+    const r = await paidQuery({
+      privateKey: '0x' + '11'.repeat(32),
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response('', { status: 402, headers: { 'payment-required': CHALLENGE_B64 } });
+      },
+    });
+    assert.equal(r.ok, false);
+    assert.equal(calls, 1, 'платёж не должен был уйти — потолок отказал раньше');
+    assert.equal(r.reason, 'payment_over_cap');
+    assert.equal(r.spendUnknown, false, 'подпись не строилась — денег не ушло, и это известно');
+    assert.match(r.detail, /spendControls/i, 'причина потеряла связь с потолком');
+  } finally {
+    if (prev === undefined) delete process.env.X402_MAX_PER_PAYMENT;
+    else process.env.X402_MAX_PER_PAYMENT = prev;
+  }
 });
 
 test('402 → payment → retry: the wrapper actually pays, with a stubbed gateway', async () => {
@@ -106,28 +173,11 @@ test('402 → payment → retry: the wrapper actually pays, with a stubbed gatew
   // `wrapFetchWithPayment` needs an x402 CLIENT, not a viem account. With the account
   // the wrapper threw and the request was NEVER retried — a paid path that could not
   // pay. No money moves here: the gateway is a stub.
-  const CHALLENGE = Buffer.from(
-    JSON.stringify({
-      x402Version: 2,
-      accepts: [
-        {
-          scheme: 'exact',
-          network: 'eip155:8453',
-          amount: '10000',
-          payTo: '0x79DC34E41B2b591078d3dE222C43EcaaBD52FcCB',
-          maxTimeoutSeconds: 300,
-          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-          extra: { assetTransferMethod: 'eip3009', name: 'USD Coin', version: '2' },
-        },
-      ],
-    }),
-  ).toString('base64');
-
   const calls = [];
   const stubGateway = async (_url, init) => {
     calls.push(init?.headers ?? {});
     if (calls.length === 1) {
-      return new Response('', { status: 402, headers: { 'payment-required': CHALLENGE } });
+      return new Response('', { status: 402, headers: { 'payment-required': CHALLENGE_B64 } });
     }
     return new Response('{"data":{"ok":true}}', {
       status: 200,
