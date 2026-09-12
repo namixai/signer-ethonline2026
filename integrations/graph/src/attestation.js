@@ -140,6 +140,34 @@ export async function verifyAttestation(rawBody, attestation, network = GRAPH_NE
   // `response_cid_mismatch`. Опаснее всего то, ЧТО именно ломалось: сверка подписи
   // индексера начинала проверять не то, что пришло, и молча объявляла годный ответ
   // подделанным. Найдено ревью CodeRabbit на signer-mcp#19.
+  // 🔴 И САМА АТТЕСТАЦИЯ ПРОВЕРЯЕТСЯ НА ФОРМУ — ДО ПЕРВОГО ОБРАЩЕНИЯ К ПОЛЮ. Замерено
+  // 12.09: `verifyAttestation('{}', null)` и то же с `undefined` БРОСАЛИ TypeError
+  // «Cannot read properties of null (reading 'responseCID')». Весь файл объявляет, что
+  // отказывает по имени и не бросает никогда; на пустом входе это было неправдой, и
+  // ломается такое первым — пустое значение приходит из `JSON.parse` чужого ответа
+  // ровно так же легко, как испорченная подпись.
+  //
+  // Отдельно `responseCID`: без этой проверки `{}` отказывал как `response_cid_mismatch`
+  // с `claimed: undefined`. Формально верно, по смыслу — мимо: читатель идёт сверять
+  // байты ответа, тогда как аттестации не было вовсе. Разные болезни, разные лечения.
+  if (attestation === null || typeof attestation !== 'object' || Array.isArray(attestation)) {
+    return {
+      ok: false,
+      reason: 'attestation_required',
+      detail: { got: attestation === null ? 'null' : Array.isArray(attestation) ? 'array' : typeof attestation },
+    };
+  }
+  if (typeof attestation.responseCID !== 'string') {
+    return {
+      ok: false,
+      reason: 'attestation_required',
+      detail: {
+        note: 'no responseCID to compare against; this is a missing attestation, not a digest disagreement',
+        field: 'responseCID',
+        type: typeof attestation.responseCID,
+      },
+    };
+  }
   const computed = keccak256(typeof rawBody === 'string' ? stringToBytes(rawBody) : rawBody);
   if (computed !== attestation.responseCID) {
     return {

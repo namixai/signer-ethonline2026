@@ -109,6 +109,70 @@ else:
     print(f'  ok   honest fixture -> PCR0 from the document, signature verifies '
           f'(chain check present, verdict not asserted; exit {code})')
 
+# ── 0b. 🔴 A LEGAL RE-PACKING IS NOT A DEFECT: COSE_Sign1 inside CBOR tag 18. ──
+#
+# RFC 8152 permits it, our gateway does not send it, and before the tag branch existed
+# both of our verifiers refused such a document as unreadable — calling a valid
+# attestation broken and blaming its producer. Nothing broke because nothing sent one.
+raw_doc = base64.b64decode(body['attestation_doc_b64'])
+must(raw_doc[0] == 0x84, 'MUTATION DID NOT APPLY: the fixture is not a bare 4-item array')
+tagged = dict(body)
+tagged['attestation_doc_b64'] = base64.b64encode(b'\xd2' + raw_doc).decode()
+must(base64.b64decode(tagged['attestation_doc_b64'])[0] == 0xD2,
+     'MUTATION DID NOT APPLY: the tag byte did not get prepended')
+_, plain_states = run(body)
+tag_code, tag_states = run(tagged)
+if tag_states.get('cose_parsed') is not True:
+    failures.append('tag 18: a legally tagged document was refused as unreadable')
+elif tag_states != plain_states:
+    failures.append(f'tag 18: the verdict changed with the tag: {plain_states} vs {tag_states}')
+else:
+    print('  ok   a COSE_Sign1 in tag 18 reads identically to the same bytes untagged')
+
+# And a tag we do not implement is refused rather than swallowed.
+other = dict(body)
+other['attestation_doc_b64'] = base64.b64encode(b'\xd8\x3d' + raw_doc).decode()
+proc_other = subprocess.run([sys.executable, str(VERIFY), '--nonce', NONCE],
+                            input=json.dumps(other), capture_output=True, text=True)
+if proc_other.returncode != 2:
+    failures.append(f'an unimplemented CBOR tag should be could-not-check (2), got {proc_other.returncode}')
+else:
+    print('  ok   an unimplemented CBOR tag is refused, not swallowed (exit 2)')
+
+# ── 0c. 🔴 …BUT ONLY AT THE OUTERMOST LEVEL. ──
+#
+# The first version of the tag branch unwrapped tag 18 anywhere, and the same decoder
+# reads sign1[0] and sign1[2]. So a tagged protected header or a tagged payload would
+# have unwrapped and then passed the type checks: we would have accepted a document no
+# COSE implementation produces, over bytes whose framing we had quietly rewritten.
+def _rewrap(sign1_parts):
+    """Re-assemble a COSE_Sign1 from raw byte strings."""
+    return av.head(4, 4) + b''.join(av.head(2, len(x)) + bytes(x) for x in sign1_parts)
+
+
+sign1_raw, _ = av.dec(base64.b64decode(body['attestation_doc_b64']), 0, cose_tag_ok=True)
+prot_b, unprot_b, payload_b, sig_b = sign1_raw[0], b'', sign1_raw[2], sign1_raw[3]
+for label, parts in (
+    ('tagged protected header', [b'\xd2' + bytes(prot_b), payload_b, sig_b]),
+    ('tagged payload', [prot_b, b'\xd2' + bytes(payload_b), sig_b]),
+):
+    # The array is rebuilt by hand because the unprotected map must stay a bare 0xa0.
+    raw_new = (av.head(4, 4) + av.head(2, len(parts[0])) + bytes(parts[0]) + b'\xa0'
+               + av.head(2, len(parts[1])) + bytes(parts[1])
+               + av.head(2, len(parts[2])) + bytes(parts[2]))
+    must(raw_new != base64.b64decode(body['attestation_doc_b64']),
+         f'MUTATION DID NOT APPLY: {label} produced the original bytes')
+    probe = dict(body)
+    probe['attestation_doc_b64'] = base64.b64encode(raw_new).decode()
+    proc = subprocess.run([sys.executable, str(VERIFY), '--nonce', NONCE],
+                          input=json.dumps(probe), capture_output=True, text=True)
+    if proc.returncode != 2:
+        failures.append(f'{label}: an inner tag 18 must be a could-not-check (2), got {proc.returncode}')
+    elif 'tag' not in proc.stderr.lower():
+        failures.append(f'{label}: refused, but the reason never mentions the tag: {proc.stderr[:120]!r}')
+    else:
+        print(f'  ok   an inner tag 18 is refused: {label}')
+
 # ── 1. one bit of PCR0 inside the signed document ──
 sign1, _ = av.dec(base64.b64decode(body['attestation_doc_b64']))
 payload_bstr = sign1[2]
