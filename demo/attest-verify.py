@@ -76,7 +76,7 @@ ES384 = -35
 NITRO_ROOT_SHA256 = '641a0321a3e244efe456463195d606317ed7cdcc3c1756e09893f3c68f79bb5b'
 
 
-def dec(b, i=0):
+def dec(b, i=0, cose_tag_ok=False):
     """Minimal CBOR reader: enough for an NSM attestation document, nothing more."""
     mt, ai = b[i] >> 5, b[i] & 0x1F
     i += 1
@@ -132,15 +132,28 @@ def dec(b, i=0):
             out[k] = v
         return out, i
     if mt == 6:
-        # 🔴 A TAG IS NOT A DEFECT. RFC 8152 permits a COSE_Sign1 wrapped in tag 18, so
-        # `0xd2 0x84 …` encodes exactly the document we read today as `0x84 …`. Until this
-        # branch existed both of our verifiers refused a tagged document as unreadable —
-        # blaming a valid attestation. Our gateway sends it untagged, which is why nothing
-        # broke and why nobody noticed. Any other tag is refused BY NUMBER rather than
-        # swallowed: silently ignoring semantics we do not implement is how a parser
-        # starts agreeing to things.
-        if val != 18:
-            raise ValueError(f'unexpected CBOR tag {val}')
+        # 🔴 A TAG IS NOT A DEFECT — AND TAG 18 IS LEGAL IN EXACTLY ONE PLACE. RFC 8152
+        # permits a COSE_Sign1 wrapped in tag 18, so `0xd2 0x84 …` encodes exactly the
+        # document we read today as `0x84 …`. Before that was handled, both of our
+        # verifiers refused a tagged document as unreadable — blaming a valid attestation.
+        #
+        # 🔴 But the first version of this branch unwrapped tag 18 ANYWHERE, and this same
+        # decoder reads `sign1[0]` and `sign1[2]`. So a tagged protected header or a
+        # tagged payload would also have unwrapped and then passed the type checks, and we
+        # would have accepted a document no COSE implementation would produce — signing
+        # over bytes whose framing we had quietly rewritten. Caught in review on the PR
+        # that introduced it.
+        #
+        # `cose_tag_ok` is therefore set by the OUTERMOST call only and never propagates:
+        # every recursive call below leaves it false. Nested tags, including a second
+        # tag 18, are refused by number, as is any tag we do not implement — silently
+        # ignoring semantics is how a parser starts agreeing to things.
+        if not (cose_tag_ok and val == 18):
+            raise ValueError(
+                f'unexpected CBOR tag {val}'
+                if not cose_tag_ok
+                else f'unexpected CBOR tag {val} (only tag 18 is legal here)'
+            )
         return dec(b, i)
     if mt == 7:
         if ai in (20, 21, 22, 23):
@@ -217,7 +230,8 @@ def main():
 
     checks = {}
     try:
-        sign1, _consumed = dec(raw)
+        # The only call in this file that may see a COSE tag: the document envelope.
+        sign1, _consumed = dec(raw, 0, cose_tag_ok=True)
     except Exception as err:
         unreadable(f'the body is not CBOR ({type(err).__name__})')
         return 2
@@ -231,7 +245,15 @@ def main():
         protected, _ = dec(bytes(sign1[0]))
         payload, _ = dec(bytes(sign1[2]))
     except Exception as err:
-        unreadable(f'the protected header or payload is not CBOR ({type(err).__name__})')
+        # 🔴 THE DECODER'S OWN MESSAGE IS PASSED THROUGH, and that is deliberate rather
+        # than sloppy. Elsewhere in this project a library's error is withheld because it
+        # quotes the rejected VALUE back (viem prints the scalar it refused). This decoder
+        # is ours and its messages carry only structure — a tag number, a major type, an
+        # additional-info byte — never a value. Withholding it cost more than it saved:
+        # a tagged protected header was reported as "not CBOR", which is false and sends
+        # the reader looking for corruption. The bytes were CBOR; the tag was in a place
+        # no tag may be.
+        unreadable(f'the protected header or payload could not be read: {err}')
         return 2
     if not isinstance(protected, dict) or protected.get(1) != ES384:
         alg = protected.get(1) if isinstance(protected, dict) else type(protected).__name__

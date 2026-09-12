@@ -152,8 +152,11 @@ Python version beyond 3.
 (2026-09-02..05) and **migrated into this repository as one commit** on 2026-09-07
 (`c81fddd`), which is why four days of authoring do not appear as four days of commits here.
 Everything after the migration was written in this repository and is in the log normally:
-`git log --oneline -- integrations/graph` shows **nine** commits today — the migration plus
-eight.
+`git log --oneline -- integrations/graph` shows nine commits **as measured on 12 September
+2026** — the migration plus eight. That number is stamped with a date rather than left
+floating, because it goes stale on the next commit to that directory, and a counter in
+prose with no date is the thing this file has already been wrong about twice. The command
+is the claim; the number is a snapshot of it.
 
 🔴 That sentence used to say "its history here is a single commit", which the command it
 invites contradicts on sight. It was true of the migration and stopped being true the next
