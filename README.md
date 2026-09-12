@@ -56,6 +56,26 @@ interchangeable in a sentence. First only in the sense of our own first; the rul
 ourselves to are in `CONTINUITY.md`, and one of them forbids the
 other reading.
 
+🔴 **And a distinction about the evidence, which matters more than the list.** Of those
+three venues, **exactly one can be checked by an outsider without us**: Hyperliquid is
+on-chain and its `info` API answers to anyone. **Binance and OKX cannot be.** They are
+centralised, there is no public address, and the only artefacts are venue responses in our
+own logs — which is our word about ourselves, however carefully we kept them. A reviewer
+should read those two as unverifiable by construction, not as verified-and-omitted.
+
+One venue that a stranger can confirm, said plainly, is worth more than three that rest on
+our logs.
+
+🔴 **And what that one venue does and does not confirm — a boundary that must not be glued
+shut, because gluing it is the class of error this repository spent a day removing.** The
+venue can confirm two things and not a third. It confirms that a named agent key is
+**approved to sign** for the master account, and that particular fills happened. It says
+**nothing about where that key lives.** "The key is inside an attested enclave" is a
+different claim, proved by a different link — the reproducible build and its attestation,
+below — and a chain is only as strong as its weakest link, not as strong as the link you
+quote. A reader who takes the venue's answer as proof of the enclave has been misled, and
+it would be our sentence that misled them.
+
 Nothing here is renamed or backdated. The Continuity track allows pre-existing work;
 concealing it would be both a rule violation and a pointless one, since commit dates outlive
 explanations. `CONTINUITY.md` carries the full component-by-component table and is updated
