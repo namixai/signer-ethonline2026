@@ -172,7 +172,11 @@ export async function measureLeverage({
   const priced = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
   const sampledRows = results.filter((r) => r.sampled);
   const usablePriceRows = sampledRows.filter((r) => priced(r.topPriceUSD)).length;
-  const zeroPriceRows = sampledRows.length - usablePriceRows;
+  // 🔴 Имя называет то, что считается. Поле звалось `zeroPriceRows`, а дополнение к
+  // `usablePriceRows` шире нуля: туда попадают null, пустая строка, нечисло и
+  // отрицательное. Читатель отчёта, увидев «zero», решает, что цена была 0 — и не
+  // смотрит на остальные случаи. Поймано ботом на PR #25.
+  const unusablePriceRows = sampledRows.length - usablePriceRows;
 
   return {
     // 🔴 The summary must not read stronger than the run. In free mode every per-result
@@ -205,7 +209,7 @@ export async function measureLeverage({
     // Сколько наблюдённых строк несли цену, которой можно пользоваться. Ноль здесь не
     // отменяет клейм выше и не подтверждает его: он про то, что цена НЕ наблюдалась.
     usablePriceRows,
-    zeroPriceRows,
+    unusablePriceRows,
     schema: 'Messari Standardized Subgraph — DEX AMM (Extended)',
     registry: 'https://github.com/messari/subgraphs/blob/master/deployment/deployment.json',
     docs: 'https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/',

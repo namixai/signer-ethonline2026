@@ -29,5 +29,5 @@ billed response that carries a GraphQL error and no data: proof that a verified 
 is not a price.
 
 **If you re-record any of these,** the new `requestCID` will differ again, and that is
-expected. What must not change silently is `PRICE_QUERY` itself — `../fetch.js` explains
+expected. What must not change silently is `PRICE_QUERY` itself — `../../src/fetch.js` explains
 why, and a test asserts its bytes.

@@ -65,9 +65,11 @@ completed, not that it checked the right thing. Fixed, and that test now fails w
 `rp_id` is made up. The suite count in an earlier draft of this letter — 155 — has been
 out of date since the week it was written, so here it is with the command instead of a
 number to take on trust. As of 12 September, from `integrations/graph/`: `npm test`
-gives **231 passing, 0 skipped** with the live checks on, and `npm run test:offline`
-gives **225 passing with 6 skipped** — the six being exactly the checks that need a
-network, each naming why it was skipped.
+gives **232 passing, 0 skipped** with the live checks on, and `npm run test:offline`
+gives **226 passing with 6 skipped** — the six being exactly the checks that need a
+network, each naming why it was skipped. (Those two numbers moved by one while this
+branch was open, because a check was added to it. That is the argument for the command
+rather than against it.)
 
 **Why we're including this rather than just the fix.** A suite that only proves the right
 answer passes just as happily when both sides of an assertion share the same mistake. This

@@ -72,6 +72,31 @@ about. Where a prompt contains standing internal procedure — perimeter discipl
 machine may be touched — that part is a department rule rather than a task, and it is out
 of scope here rather than rewritten.
 
+🔴 **What is missing from that directory, said before anyone has to notice it.** The three
+prompts there are dated 14–16 August and cover the Permit2 and Uniswap reading. The work
+done during the event window — the paid Graph integration, the World ID path, the demo and
+the reel — was directed the same way, by written task orders, and **none of those are in
+this repository.** The commit dates make the gap plain: 24 commits in August, then 22 more
+across 3–11 September with no September prompt beside them. The reason is dull rather than
+flattering: those orders are written in Russian in an internal channel, they carry other
+departments' business and standing operational rules alongside the task, and splitting the
+task out of them is an editing job nobody has done. Publishing them is a decision for the
+person whose project this is, not something a model session gets to make on its own.
+
+So read `plans/prompts/` as three real records, not as the complete set of direction. We
+would rather hand a judge that sentence than a directory that quietly implies completeness.
+
+**Which parts are AI-written, concretely, since the rule asks for files rather than
+areas.** Effectively all of it. This repository tracks 100 files. Ninety-nine of them —
+everything under `integrations/`, `vectors/`, `demo/`, `specs/`, `plans/`, `scripts/`
+and `.github/`, every Markdown document at the top level including this one, and
+`.gitignore` — were written by Claude Code sessions. The hundredth is `LICENSE`, which
+is the Apache License 2.0 verbatim and nobody's authorship. There is no hand-written
+module hiding in here, and no file where a human typed the code and a model typed the
+comments. What a human did is the list at the top of this file — scope, tracks,
+publication, spending — plus the arguing: the corrections marked 🔴 throughout these
+documents exist because a claim was challenged, not because a model noticed on its own.
+
 ## Honest note about the boundary
 
 Some of this material was written before the event window opened. It is dated where it

@@ -1,10 +1,30 @@
 # Voiceover — the reel, read by a person
 
-**Who reads it:** Alex, over the footage, once there is footage. ETHGlobal forbids
-synthesized or AI voices, and forbids a silent screencast with text cards instead of
-talking. It does **not** require the voice to be recorded in sync with the screen — that
-gap is why this file exists: the footage gets shot first, the voice goes on top afterwards,
-and a fluffed line is re-read rather than re-shot.
+**Who reads it:** Alex, over the footage, once there is footage. The rule is **ETHOnline
+2026's**, not a general ETHGlobal one, and it is worth quoting from its own page rather
+than paraphrasing: under "Common mistakes to avoid in your demo video" the event says *do
+not use a text to speech synthesizer / AI Voiceover*, and *do not play music with text on
+the video describing your project (instead of talking)*. Source, checked 12 September:
+<https://ethglobal.com/events/ethonline2026/info/details>. Nothing there requires the
+voice to be recorded in sync with the screen — that gap is why this file exists: the
+footage gets shot first, the voice goes on top afterwards, and a fluffed line is re-read
+rather than re-shot.
+
+🔴 **Before recording anything, the constraints that reject an upload rather than cost a
+point.** All four are from the same page, and none of them was written down anywhere in
+this repository until 12 September — which is how a re-shoot gets discovered on deadline
+day:
+
+| the rule | what happens if it is broken |
+|---|---|
+| between 2 and 4 minutes | upload is **automatically rejected** outside those bounds |
+| at least 720p | upload **fails** below it |
+| no mobile phone as the camera | asked to re-submit |
+| no speeding the video up to fit | asked to re-submit |
+
+This script is paced for 3:47, which leaves thirteen seconds of margin under the ceiling
+and is nowhere near the floor. If a block gets cut on the day, check the total is still
+over two minutes before exporting.
 
 ⚠️ **State, so this file is not mistaken for a record of work already done:** nothing has
 been filmed yet. This is a script waiting for a take, and `CONTINUITY.md` says the same in

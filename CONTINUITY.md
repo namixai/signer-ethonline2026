@@ -5,7 +5,7 @@ track asks for, and it is also the only version of this document worth writing: 
 submission that passes off a pre-existing product as nine days of work is a lie that the
 commit history exposes anyway.
 
-**Last updated:** 2026-09-07 (the window section below rewritten under fact — see the diff
+**Last updated:** 2026-09-12 (the window section below rewritten under fact — see the diff
 history of this file for the 2026-08-16 plan as first written; nothing there is deleted).
 
 ## The position in one sentence

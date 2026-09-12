@@ -353,6 +353,68 @@ test('🔴 a signature nobody can read refuses by name, and never throws', async
   }
 });
 
+test('🔴 a broken digest field does NOT report itself as a broken signature', async () => {
+  // Найдено ботом на PR #25 и подтверждено замером: дайджест и восстановление подписи
+  // стояли в одном try, и порча `requestCID` выдавала `note: signature could not be
+  // read` при трёх идеальных r/s/v (length 66, hex true) — отказ показывал пальцем на
+  // здоровую подпись. Эта проверка умирает вместе с правкой: сведите два try обратно в
+  // один, и stage станет 'signature', а список полей — r,s,v.
+  const base = att('sample1.attestation.json');
+  const body = raw('sample1.body.json');
+
+  // 🔴 `0x` + 64 буквы «Z» здесь не для красоты: до правки этот вход НЕ отказывался
+  // вовсе. viem сверяет у bytes32 размер, а не алфавит, поэтому не-hex проходил
+  // насквозь, менял дайджест и восстанавливал постороннего подписанта — ok:true.
+  const bads = {
+    'не hex, но верной длины': `0x${'Z'.repeat(64)}`,
+    'короткий':               '0xZZ',
+    'без 0x':                 'a'.repeat(64),
+    'пустая строка':          '',
+    'null':                   null,
+    'число':                  5,
+  };
+
+  for (const field of ['requestCID', 'subgraphDeploymentID']) {
+    for (const [name, bad] of Object.entries(bads)) {
+      const label = `${field}/${name}`;
+      const r = await verifyAttestation(body, { ...base, [field]: bad });
+      assert.equal(r.ok, false, `принят негодный вход дайджеста: ${label}`);
+      assert.equal(r.reason, 'attestation_unusable', label);
+      assert.equal(r.detail.stage, 'digest', `${label}: отказ назвал не тот этап`);
+      assert.deepEqual(
+        r.detail.fields.map((f) => f.field),
+        ['requestCID', 'responseCID', 'subgraphDeploymentID'],
+        `${label}: в отказе не входы дайджеста`,
+      );
+      assert.ok(!/signature/i.test(r.detail.note), `${label}: примечание всё ещё про подпись`);
+      if (typeof bad === 'string' && bad.length > 20) {
+        assert.ok(
+          !JSON.stringify(r).includes(bad.slice(2, 30)),
+          `${label}: значение уехало в отказ`,
+        );
+      }
+    }
+  }
+
+  // Обратная половина, без которой проверка была бы зелёной на «всегда stage: digest»:
+  // порча подписи по-прежнему называет ПОДПИСЬ.
+  const sig = await verifyAttestation(body, { ...base, r: `0x${'0'.repeat(64)}` });
+  assert.equal(sig.detail.stage, 'signature');
+  assert.deepEqual(sig.detail.fields.map((f) => f.field), ['r', 's', 'v']);
+
+  // И граница проверки названа замером, а не обещанием: 64 нуля — ЗАКОННЫЙ hex, он
+  // проходит и восстанавливает другого подписанта. Отсекает его цепь (нет аллокации),
+  // а не форма. Если однажды это начнёт отказывать здесь — проверка расширилась молча.
+  const zeros = await verifyAttestation(body, { ...base, requestCID: `0x${'0'.repeat(64)}` });
+  assert.equal(zeros.ok, true, 'законный hex обязан дойти до восстановления подписанта');
+  assert.match(zeros.allocationId, /^0x[0-9a-fA-F]{40}$/);
+  assert.notEqual(
+    zeros.allocationId,
+    (await verifyAttestation(body, base)).allocationId,
+    'другой requestCID обязан дать другого подписанта — иначе дайджест не зависит от входа',
+  );
+});
+
 test('a readable signature still recovers its signer', async () => {
   // Иначе предыдущая проверка была бы зелёной при «отвергать всё».
   const r = await verifyAttestation(raw('sample1.body.json'), att('sample1.attestation.json'));

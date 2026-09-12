@@ -222,7 +222,7 @@ test('🔴 a run where every observed row is priced zero says so in the claim', 
   assert.match(r.claimSupported, /NOT ONE observed row carried a usable price/,
     'нулевая цена прошла молча — читатель достроит покупку цены');
   assert.equal(r.usablePriceRows, 0);
-  assert.equal(r.zeroPriceRows, 2);
+  assert.equal(r.unusablePriceRows, 2);
 });
 
 test('a run with real prices does NOT carry that warning', async () => {
@@ -230,6 +230,6 @@ test('a run with real prices does NOT carry that warning', async () => {
   // предупреждение, которое стоит всегда, читатель перестаёт видеть.
   const r = await measureLeverage({ deployments: two, paid: true, paidImpl: paidStub() });
   assert.equal(r.usablePriceRows, 2);
-  assert.equal(r.zeroPriceRows, 0);
+  assert.equal(r.unusablePriceRows, 0);
   assert.doesNotMatch(r.claimSupported, /NOT ONE observed row/);
 });
