@@ -97,11 +97,17 @@ find out.**
   these four, in this order, and they need only `python3`:
 
   ```bash
-  python3 verify_ours.py && python3 falsify.py && python3 verify_nft_ours.py && python3 falsify_nft.py
+  cd vectors && python3 verify_ours.py && python3 falsify.py && python3 verify_nft_ours.py && python3 falsify_nft.py
   ```
 
   That is the fallback, not the claim: the claim is `make verify`, and this is what it
   does so you can run it without the tool.
+
+  ⚠️ **The `cd` in that line was missing when this paragraph was first written**, two
+  paragraphs above a confession that the very same command had once shipped without its
+  `cd` and failed at the reader's prompt. Same defect, same page, a day apart. Caught in
+  review, and left named here rather than tidied away: knowing the shape of a mistake is
+  not the same as not making it again.
 
   🔴 **This sentence has been wrong twice, so it is worth saying how it got fixed.** First
   it omitted the `cd`, and the command failed at the reader's prompt. Then it still said
