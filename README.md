@@ -56,6 +56,95 @@ interchangeable in a sentence. First only in the sense of our own first; the rul
 ourselves to are in `CONTINUITY.md`, and one of them forbids the
 other reading.
 
+🔴 **And a distinction about the evidence, which matters more than the list.** Of those
+three venues, **exactly one can be checked by an outsider without us**: Hyperliquid is
+on-chain and its `info` API answers to anyone. **Binance and OKX cannot be.** They are
+centralised, there is no public address, and the only artefacts are venue responses in our
+own logs — which is our word about ourselves, however carefully we kept them. A reviewer
+should read those two as unverifiable by construction, not as verified-and-omitted.
+
+One venue that a stranger can confirm, said plainly, is worth more than three that rest on
+our logs.
+
+**The Hyperliquid half, as two commands you run yourself.** No account, no key, no
+permission, and nothing from us but an address:
+
+```bash
+curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
+  -d '{"type":"extraAgents","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59"}'
+```
+
+```bash
+curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
+  -d '{"type":"userFillsByTime","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+       "startTime":1787097600000,"endTime":1788566400000}'
+```
+
+**What the first should show you.** One approved agent, named `Usenami SINGER`, at address
+`0x3104d08ca5dfd217da602983682e2aba43e77907`, with a `validUntil` in February 2027. That is
+the venue's own record that this key is authorised to sign orders for that account — the
+venue saying it, not us.
+
+**What the second should show you.** Exactly **six** fills, all `BNB`, as three open/close
+pairs: 19 August, 3 September, 4 September. Each carries price, size, fee, side, `closedPnl`
+and an order id. The 19 August pair is the completed round trip named above.
+
+🔴 **Why that second command carries a time window, and why the obvious one is wrong.** The
+obvious call is `userFills`, and it returns the **most recent** fills — so the moment this
+account trades again, a reviewer would count something other than six while this file still
+said six, and the disagreement would look like us overstating rather than like a moving
+endpoint. The window above is closed and historical: 19 August 2026 00:00 UTC to 5 September
+2026 00:00 UTC, in milliseconds. It contained six fills when this was written and cannot
+contain more later, because nothing new lands in a past window. (A window is not free
+either: too narrow and you get fewer — the same window trimmed to the September pairs
+returns four. The boundaries above are deliberately round and wide.)
+
+And so that a reviewer can tell "six of ours" from "six of anything", the identifying
+fields digest to a fixed value. Recompute it from the same response:
+
+```bash
+curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
+  -d '{"type":"userFillsByTime","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+       "startTime":1787097600000,"endTime":1788566400000}' \
+| python3 -c "import sys,json,hashlib; d=json.load(sys.stdin); \
+rows=sorted(([f['time'],f['coin'],f['dir'],f['px'],f['sz'],f['oid']] for f in d), key=lambda r: r[0]); \
+print(len(rows), hashlib.sha256(json.dumps(rows,separators=(',',':')).encode()).hexdigest())"
+```
+
+Expected: `6 2d95a5053f70ff76c8f4bf563eedcf972885b7ebd8f2b27cf01b611c5e8d9cf8`. If the count or
+the digest differs, believe the venue and not this paragraph — and please open an issue,
+because one of the two is then wrong and it is probably us.
+
+🔴 **Now the three boundaries, in the order a reader is likely to blur them.** Gluing these
+together is the class of error this repository spent a day removing from its own text, so
+they are spelled out rather than left to good faith.
+
+1. **The venue does not say where the key lives.** It says the key is approved. "Inside an
+   attested enclave" is a different claim on a different link — the reproducible build and
+   its attestation, below — and a chain is as strong as its weakest link, not as strong as
+   whichever link you happen to be quoting.
+2. **The venue does not say, publicly, which key signed which fill.** Checked before this
+   paragraph was written: a fill carries `coin`, `px`, `sz`, `fee`, `side`, `dir`,
+   `closedPnl`, `oid`, `hash`, `tid`, `time` — and **no signer field**; `txDetails` answers
+   422 on the `info` endpoint and there is no public explorer route for it. So "these
+   particular fills were signed by the agent key rather than by the master key directly"
+   remains **our word**, and it is not being dressed up. What the venue proves is the
+   approval and the fills, as two separate facts.
+3. **The account is ours and the money is ours.** An approved agent and a filled round trip
+   say the mechanism works, not that anyone has trusted us with their funds.
+
+What survives all three deductions is still the most checkable thing in this submission: a
+key named for us, approved by the venue to trade an account, and trades that happened —
+none of it on our say-so, all of it in two commands.
+
+**Two proofs of the same kind, and they are the two worth your time.** This one and the
+paid-query record in `integrations/graph/LEVERAGE-EVIDENCE.md` work the same way: in both,
+the party attesting has no stake in our claim. There it is indexers signing the bytes they
+served and Base carrying the payments — two one-cent transfers five days apart, on chain,
+in blocks anyone can read. Here it is the venue's own approval record and its own fill
+history. Everything else in this repository is code you can run, which is good but is still
+us; these two are somebody else's records that happen to agree with us.
+
 Nothing here is renamed or backdated. The Continuity track allows pre-existing work;
 concealing it would be both a rule violation and a pointless one, since commit dates outlive
 explanations. `CONTINUITY.md` carries the full component-by-component table and is updated
