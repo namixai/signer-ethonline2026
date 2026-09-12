@@ -1,9 +1,15 @@
 # Voiceover — the reel, read by a person
 
-**Who reads it:** Alex, over the finished footage. ETHGlobal forbids synthesized or AI
-voices, and forbids a silent screencast with text cards instead of talking. It does **not**
-require the voice to be recorded in sync with the screen — that gap is why this file exists:
-the footage is finished, the voice goes on top, and a fluffed line is re-read, not re-shot.
+**Who reads it:** Alex, over the footage, once there is footage. ETHGlobal forbids
+synthesized or AI voices, and forbids a silent screencast with text cards instead of
+talking. It does **not** require the voice to be recorded in sync with the screen — that
+gap is why this file exists: the footage gets shot first, the voice goes on top afterwards,
+and a fluffed line is re-read rather than re-shot.
+
+⚠️ **State, so this file is not mistaken for a record of work already done:** nothing has
+been filmed yet. This is a script waiting for a take, and `CONTINUITY.md` says the same in
+its own table. An earlier version of the line above read "the footage is finished", which
+described the intended order of work but sounded like a claim about what exists.
 
 **How to use it.** Play the reel, read the column marked *SAY* out loud, start each block
 when the screen reaches the cue. Every block is written short on purpose: if you finish

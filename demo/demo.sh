@@ -140,10 +140,13 @@ print(d.get("pcr0_sha384") or "")
   note "cache-control: $(grep -i '^cache-control' /tmp/.demo_hdr | tr -d '\r' | cut -d' ' -f2-)"
   note ""
 
-  # We deliberately do NOT print `registered_onchain` from the response. That field is read
-  # from an environment variable on the gateway, so it reports what the operator configured
-  # — it is our word about ourselves. The question "is this measurement registered" has an
-  # answer that owes us nothing, and this is it.
+  # 🔴 This comment used to say we deliberately do not print `registered_onchain` from the
+  # response. Measured against the live endpoint on 12.09, the response carries exactly
+  # three fields — `attestation_doc_b64`, `pcr0_sha384`, `timestamp_ms` — and no
+  # `registered_onchain` at all, so there was nothing left to decline to print. The reason
+  # outlives the field and is why the next line exists: any such flag would be read from
+  # the gateway's own configuration, making it our word about ourselves. The question "is
+  # this measurement registered" has an answer that owes us nothing, and this is it.
   note "Is that measurement registered on chain? Ask the registry, not us:"
   printf '   cast call %s "isPCR0Active(bytes)(bool,address)" 0x%s --rpc-url %s\n' \
     "$PCR0_REGISTRY" "$pcr0" "$BASE_RPC"

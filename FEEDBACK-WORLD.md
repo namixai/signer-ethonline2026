@@ -57,11 +57,17 @@ current endpoint before we'd finished configuring the action.
 
 ## 4. A test was green with a fabricated `rp_id`, and that's a defect in the test, not the code
 
-Following your guidance to forward the IDKit proof result without remapping, we wrote that
-path to fail loudly if a caller tried to relabel fields — a negative test that itself needed
-verifying it could fail. It couldn't, at first: a live-shaped test was passing green with a
-made-up `rp_id`, meaning the assertion was checking that a call completed, not that it
-checked the right thing. Fixed; the full suite is 155/155 now, including that one.
+Following your guidance to forward the IDKit proof result without remapping, we wrote
+that path to fail loudly if a caller tried to relabel fields — a negative test that
+itself needed verifying it could fail. It couldn't, at first: a live-shaped test was
+passing green with a made-up `rp_id`, meaning the assertion was checking that a call
+completed, not that it checked the right thing. Fixed, and that test now fails when the
+`rp_id` is made up. The suite count in an earlier draft of this letter — 155 — has been
+out of date since the week it was written, so here it is with the command instead of a
+number to take on trust. As of 12 September, from `integrations/graph/`: `npm test`
+gives **231 passing, 0 skipped** with the live checks on, and `npm run test:offline`
+gives **225 passing with 6 skipped** — the six being exactly the checks that need a
+network, each naming why it was skipped.
 
 **Why we're including this rather than just the fix.** A suite that only proves the right
 answer passes just as happily when both sides of an assertion share the same mistake. This

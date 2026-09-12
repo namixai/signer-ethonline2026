@@ -203,12 +203,29 @@ sequence is in
 | `specs/SPEC-uniswap-signature-surfaces.md` | What else gets a typed-data signature in the router path besides Permit2 — three commands that do, and one nested path that does even when the top-level call doesn't |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
 
-🔴 **Russian, and not only here.** These four specs are in Russian, and so are thirty-six
-files across this repository — including `integrations/graph/README.md`, which documents
-the code this submission calls its window work, and `demo/STORYBOARD-hyperliquid.md`.
-`demo/precheck.sh` prints in Russian, and `npm run test:offline` gives Russian reasons for
-the tests it skips beside their English names. An earlier version of this paragraph said
-"all four are in Russian", which reads as a complete inventory and was not one.
+🔴 **Russian, and not only here.** As of 12 September, **39 tracked files in this
+repository contain Russian** — the four specs above among them, and among the other
+thirty-five `integrations/graph/README.md`, which documents the code this submission calls
+its window work, and `demo/STORYBOARD-hyperliquid.md`. `demo/precheck.sh` prints in
+Russian, and `npm run test:offline` gives Russian reasons for the six tests it skips,
+beside their English names. Do not take the number on trust — it is every tracked file
+holding a Cyrillic character, and it moves as files are added:
+
+```bash
+git ls-files | grep -v node_modules | python3 -c "
+import pathlib, re, sys
+cyr = re.compile(r'[\u0400-\u04FF]')
+print(sum(1 for f in sys.stdin.read().split()
+          if cyr.search(pathlib.Path(f).read_text(errors='ignore'))))"
+```
+
+(Python rather than `grep -P`, because the `grep` shipped with macOS has no `-P` and would
+answer `invalid option` rather than a number. Checked on both.)
+
+This paragraph has now been wrong twice, in the same direction both times. It first said
+"all four are in Russian", which reads as a complete inventory and was not one; the
+replacement said "thirty-six files" and was a count nobody re-ran. A number in a document
+is a claim with a shelf life, so this one ships with the command that checks it.
 
 They are internal reading notes and internal test commentary, published as they were
 written rather than translated for the occasion — the same choice `AI-USE.md` makes about
