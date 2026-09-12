@@ -178,9 +178,14 @@ run_frame_3() {
   fi
 
   # 🔴 This comment used to say we deliberately do not print `registered_onchain` from the
-  # response. Measured against the live endpoint on 12.09, the response carries exactly
-  # three fields — `attestation_doc_b64`, `pcr0_sha384`, `timestamp_ms` — and no
-  # `registered_onchain` at all, so there was nothing left to decline to print. The reason
+  # response. Measured against the live endpoint on 12.09, there is no such field to
+  # decline: with a nonce the body carries `attestation_doc_b64`, `nonce`, `pcr0_sha384`
+  # and `timestamp_ms`, and without one the same minus `nonce`. (An earlier version of
+  # this comment said "exactly three fields", counted from a request that sent no nonce
+  # while the call above does send one — a measurement quoted from the wrong run.) The
+  # body's `nonce` echo is not a check either: the gateway writes it, just as it writes
+  # `pcr0_sha384`. The nonce that matters is the one inside the signed document, which is
+  # what `attest-verify.py` compares. The reason
   # outlives the field and is why the next line exists: any such flag would be read from
   # the gateway's own configuration, making it our word about ourselves. The question "is
   # this measurement registered" has an answer that owes us nothing, and this is it.
