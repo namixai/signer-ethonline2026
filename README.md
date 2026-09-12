@@ -76,7 +76,8 @@ curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
 
 ```bash
 curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
-  -d '{"type":"userFills","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59"}'
+  -d '{"type":"userFillsByTime","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+       "startTime":1787097600000,"endTime":1788566400000}'
 ```
 
 **What the first should show you.** One approved agent, named `Usenami SINGER`, at address
@@ -84,9 +85,35 @@ curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
 the venue's own record that this key is authorised to sign orders for that account — the
 venue saying it, not us.
 
-**What the second should show you.** Six fills, all `BNB`, arranged as three open/close
+**What the second should show you.** Exactly **six** fills, all `BNB`, as three open/close
 pairs: 19 August, 3 September, 4 September. Each carries price, size, fee, side, `closedPnl`
 and an order id. The 19 August pair is the completed round trip named above.
+
+🔴 **Why that second command carries a time window, and why the obvious one is wrong.** The
+obvious call is `userFills`, and it returns the **most recent** fills — so the moment this
+account trades again, a reviewer would count something other than six while this file still
+said six, and the disagreement would look like us overstating rather than like a moving
+endpoint. The window above is closed and historical: 19 August 2026 00:00 UTC to 5 September
+2026 00:00 UTC, in milliseconds. It contained six fills when this was written and cannot
+contain more later, because nothing new lands in a past window. (A window is not free
+either: too narrow and you get fewer — the same window trimmed to the September pairs
+returns four. The boundaries above are deliberately round and wide.)
+
+And so that a reviewer can tell "six of ours" from "six of anything", the identifying
+fields digest to a fixed value. Recompute it from the same response:
+
+```bash
+curl -s https://api.hyperliquid.xyz/info -H 'content-type: application/json' \
+  -d '{"type":"userFillsByTime","user":"0x21538eBF6598e5866BA496A954dE8E39097bFB59",
+       "startTime":1787097600000,"endTime":1788566400000}' \
+| python3 -c "import sys,json,hashlib; d=json.load(sys.stdin); \
+rows=sorted(([f['time'],f['coin'],f['dir'],f['px'],f['sz'],f['oid']] for f in d), key=lambda r: r[0]); \
+print(len(rows), hashlib.sha256(json.dumps(rows,separators=(',',':')).encode()).hexdigest())"
+```
+
+Expected: `6 2d95a5053f70ff76c8f4bf563eedcf972885b7ebd8f2b27cf01b611c5e8d9cf8`. If the count or
+the digest differs, believe the venue and not this paragraph — and please open an issue,
+because one of the two is then wrong and it is probably us.
 
 🔴 **Now the three boundaries, in the order a reader is likely to blur them.** Gluing these
 together is the class of error this repository spent a day removing from its own text, so
