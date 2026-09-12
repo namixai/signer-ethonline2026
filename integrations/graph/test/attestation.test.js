@@ -353,6 +353,35 @@ test('🔴 a signature nobody can read refuses by name, and never throws', async
   }
 });
 
+test('🔴 an absent attestation refuses by name and never throws', async () => {
+  // Замер 12.09: `verifyAttestation('{}', null)` и с `undefined` бросали TypeError
+  // «Cannot read properties of null». Файл объявляет, что не бросает никогда — на
+  // пустом входе это было неправдой, а пустое значение приходит из разбора чужого
+  // ответа так же легко, как испорченная подпись.
+  const body = raw('sample1.body.json');
+  for (const [name, att] of [
+    ['null', null],
+    ['undefined', undefined],
+    ['пустой объект', {}],
+    ['массив', []],
+    ['строка', 'x'],
+    ['число', 5],
+  ]) {
+    // Не в try/catch: брошенное исключение обязано ПРОВАЛИТЬ тест, а не быть им поймано.
+    const r = await verifyAttestation(body, att);
+    assert.equal(r.ok, false, name);
+    assert.equal(r.reason, 'attestation_required', `${name}: не то имя отказа`);
+  }
+
+  // 🔴 И РАЗНЫЕ БОЛЕЗНИ НАЗЫВАЮТСЯ РАЗНО. Пустой объект раньше отказывал как
+  // `response_cid_mismatch` с `claimed: undefined` — формально верно, по смыслу мимо:
+  // читатель шёл сверять байты ответа, тогда как аттестации не было вовсе. А годная
+  // аттестация с ДРУГИМ responseCID по-прежнему обязана давать несовпадение.
+  const good = att('sample1.attestation.json');
+  const mismatched = await verifyAttestation(body, { ...good, responseCID: `0x${'0'.repeat(64)}` });
+  assert.equal(mismatched.reason, 'response_cid_mismatch');
+});
+
 test('🔴 a broken digest field does NOT report itself as a broken signature', async () => {
   // Найдено ботом на PR #25 и подтверждено замером: дайджест и восстановление подписи
   // стояли в одном try, и порча `requestCID` выдавала `note: signature could not be

@@ -136,6 +136,11 @@ run_frame_3() {
   hdr=$(mktemp -t demo_hdr) || { stub "frame 3 not run — mktemp failed"; return 0; }
   trap 'rm -f "$hdr"' RETURN
   body=$(curl -s -D "$hdr" --max-time 25 "${DEMO_GATEWAY}/attestation?nonce=${nonce}")
+  # ⚠️ This line PRINTS the header; nothing here CHECKS it, and neither verifier does.
+  # Said plainly because a printed value looks like a checked one. What actually defeats a
+  # cached or replayed document is the nonce: a stale body carries a nonce that is not the
+  # one we just generated, and `nonce_echoed` goes red on it. `no-store` is the operator
+  # being tidy; the nonce is the part that holds if the operator is not.
   note "cache-control: $(grep -i '^cache-control' "$hdr" | tr -d '\r' | cut -d' ' -f2-)"
   note ""
 

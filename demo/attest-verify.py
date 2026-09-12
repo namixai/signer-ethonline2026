@@ -131,8 +131,23 @@ def dec(b, i=0):
             v, i = dec(b, i)
             out[k] = v
         return out, i
+    if mt == 6:
+        # 🔴 A TAG IS NOT A DEFECT. RFC 8152 permits a COSE_Sign1 wrapped in tag 18, so
+        # `0xd2 0x84 …` encodes exactly the document we read today as `0x84 …`. Until this
+        # branch existed both of our verifiers refused a tagged document as unreadable —
+        # blaming a valid attestation. Our gateway sends it untagged, which is why nothing
+        # broke and why nobody noticed. Any other tag is refused BY NUMBER rather than
+        # swallowed: silently ignoring semantics we do not implement is how a parser
+        # starts agreeing to things.
+        if val != 18:
+            raise ValueError(f'unexpected CBOR tag {val}')
+        return dec(b, i)
     if mt == 7:
-        return {20: False, 21: True, 22: None, 23: None}.get(ai, val), i
+        if ai in (20, 21, 22, 23):
+            return {20: False, 21: True, 22: None, 23: None}[ai], i
+        # Floats are major 7 with ai 25/26/27. Refused on purpose: nothing in an
+        # attestation document is a float.
+        raise ValueError(f'unsupported simple or float value (ai {ai})')
     raise ValueError(f'unsupported major type {mt}')
 
 

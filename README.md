@@ -149,9 +149,16 @@ which reads like our bug and is not one. CI runs Node 22. Nothing here needs a s
 Python version beyond 3.
 
 `integrations/graph/` — the reading and verification code, written during the event window
-(2026-09-02..05) and migrated into this repository on 2026-09-07, which is why its history
-here is a single commit rather than four days of them. Said out loud because `CONTINUITY.md`
-invites exactly this check. Node, no build step:
+(2026-09-02..05) and **migrated into this repository as one commit** on 2026-09-07
+(`c81fddd`), which is why four days of authoring do not appear as four days of commits here.
+Everything after the migration was written in this repository and is in the log normally:
+`git log --oneline -- integrations/graph` shows **nine** commits today — the migration plus
+eight.
+
+🔴 That sentence used to say "its history here is a single commit", which the command it
+invites contradicts on sight. It was true of the migration and stopped being true the next
+time anyone touched the directory. Said out loud because `CONTINUITY.md` asks for exactly
+this check, and a claim that fails the check it proposes is worse than no claim. Node, no build step:
 
 ```bash
 cd integrations/graph && npm ci && npm test    # the run prints the count
@@ -372,8 +379,34 @@ and the closure check is
 [`poc/scripts/enclave-closure-check.py`](https://github.com/namixai/signer/blob/main/poc/scripts/enclave-closure-check.py).
 Both paths are spelled out because the obvious guesses — those filenames at the repository
 root — are 404s, and a reviewer who has to search for the thing we told them to run has
-already been given a worse answer than the one we meant. It is the one thing worth an hour
-of a reviewer's time.
+already been given a worse answer than the one we meant.
+
+🔴 **What the rebuild costs you, before you spend an hour on it.** This paragraph used to
+end by calling it "the one thing worth an hour of a reviewer's time" and said nothing about
+what it needs. That sends a reviewer on a laptop into a wall: `nitro-cli` is Linux-only, so
+the full rebuild wants **a Linux host with Docker and AWS `nitro-cli`**, plus network egress
+for the pinned sources. An EC2 instance is the practical way to get one; an AWS **account**
+is not itself required, because `nitro-cli` computes the EIF measurement offline and no
+enclave has to run. Those prerequisites are listed in
+[`docs/REPRODUCIBLE-BUILD.md`](https://github.com/namixai/signer/blob/main/docs/REPRODUCIBLE-BUILD.md)
+— and they were missing **here**, which is where a reviewer starts.
+
+**Two of the three links need none of that, and they are the first two:**
+
+1. **The attestation itself.** `get_attestation` in `@usenami/signer-mcp` fetches it with a
+   fresh nonce and checks the hardware signature, the certificate chain and the pinned AWS
+   Nitro root locally — Node and nothing else.
+2. **The on-chain registry.** One `cast call` against Base, or any block explorer. Read both
+   returned values: whether the measurement is active **and** which owner registered it.
+
+Only the third link — "and that measurement is what this source builds to" — needs the Linux
+host. Without one, the honest half-step is
+[`poc/scripts/enclave-closure-check.py`](https://github.com/namixai/signer/blob/main/poc/scripts/enclave-closure-check.py):
+**Python standard library only, no Docker, no `nitro-cli`.** It recomputes the enclave's
+dependency closure from `Cargo.lock` and compares it against the snapshot the published
+measurement was taken on, so a dependency bump that silently moved the PCR0 inputs comes out
+as exit 1. It does not prove the measurement; it proves the inputs to it have not moved since
+the measurement was taken — which is the part that has actually broken on us before.
 
 ## AI
 

@@ -56,6 +56,38 @@ word; this is not.
 reproduce a known value, and `attestation.js` refuses to claim a check it cannot perform.
 Equality across deployments needs no preimage: it is a comparison, not a reconstruction.
 
+## The same measurement again, five days later — 2026-09-12
+
+The table above rests on one pair of paid queries from one afternoon. A claim that was
+measured once and a claim that reproduces are different claims, so here is the second pair.
+
+| | first pass | second pass |
+|---|---|---|
+| date | 2026-09-07 | 2026-09-12 |
+| payer | `0x4dF34ec7…f81F` | `0xCf3E005a…5ba9` |
+| payment txs (Base) | `0xa74788d0…37f1a`, `0xc7addaf5…96f599` | `0xaaf0bfd974d011fe48b541d489ddf24e28a65a60e53abd7facc4135a753e235a` (block 51 216 605), `0x2ebdb456bfb700fa36a3d4b58c41448f814917570ea9ea4f42b4366cbfd9a362` (block 51 216 606) |
+| recipient | `0x79dc34e4…fccb` | `0x79dc34e4…fccb` — the same |
+| price per query | $0.01 USDC | $0.01 USDC |
+
+Every value in the second column was read off Base directly — the USDC `Transfer` logs for
+those two blocks — rather than copied from a run's own output. Two adjacent blocks, one cent
+each, to the gateway address the first pass paid.
+
+⚠️ **What this does NOT show, said here because the obvious reading is wrong.** The two
+payer addresses are different, and **both of them are ours**: the first is the agent wallet
+this project has used for x402 all along, the second a wallet funded specifically for these
+measurements. So this is the same route and the same price reproducing from a second
+account of ours after five days — it is **not** an independent third party paying, and
+nothing here should be read as one. A reader can confirm that for themselves from the
+addresses above, which is the point of printing them.
+
+⚠️ **The `requestCID` row is deliberately absent from the second column.** The digest
+equality is the strongest line in the table above, and repeating it requires the
+attestation artifacts from that second run, which are not in this repository. It is not
+carried over on the strength of a matching price. When those artifacts are published, the
+row can be filled in and checked; until then the second pass stands for the payment route
+and the price, and for nothing about the digest.
+
 ## What became easier, concretely
 
 - **Zero** lines changed between deployments: same query, same parser, same usability
