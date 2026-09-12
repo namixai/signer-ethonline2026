@@ -41,14 +41,14 @@ runs long, cut a sentence — every block below has one sentence that can go, ma
 |---|---|---|
 | 3:04 | frame 3 header, nonce | "Last, the part that needs nothing from us. No account, no token, no permission." |
 | 3:14 | `pcr0_sha384`, attestation doc | "The service returns a measurement of the code it is running, signed by the hardware." |
-| 3:22 | the `cast call`, its answer, then the closing lines | "Ask the registry on Base whether it is active — and read what it actually says, with the owner address beside it. 🔴 **READ THE SCREEN, DO NOT MEMORISE THIS.** The registry holds one active measurement per owner, and which of our lanes holds it moves; on 11 September it answers true under our owner, and an earlier version of this script said false because that was true when it was written. If it says false, say so and add that another lane holds the registration — that is worth a sentence, not alarm. Either way, close on the check that needs no registry at all: rebuild from the public clone, and compare." |
+| 3:22 | the `cast call`, its answer, then the closing lines | "Ask the registry on Base whether it is active — and read what it actually says, with the owner address beside it. 🔴 **READ THE SCREEN. THIS SCRIPT DOES NOT KNOW THE ANSWER AND MUST NOT PRETEND TO.** Three things can appear and they are not the same: **true** with an owner you recognise, which is the pass; **false**, which is worth one calm sentence — the registry keeps one active measurement per owner, so another of our lanes *may* be holding it at that moment; and **a failed call**, which is a could-not-check and not a false at all, so say that instead of reading it as a refusal. Close on the check that needs no registry: rebuild from the public clone, and compare." |
 
 ---
 
 ## If a block will not fit
 
 Cut in this order, and stop as soon as it fits: every `[cut]` line, then the second sentence
-of Act 2's first block, then Act 3's 2:24 block entirely. Do **not** cut the boundary line at
+of Act 2's first block, then Act 3's 3:14 block entirely. Do **not** cut the boundary line at
 2:17 or the registry reading at 3:22 — those two are the honesty of the whole reel, and a
 reel that drops them is selling something else. (That line used to be called "the false
 explanation", from when the registry answered false; the point was never the word, it was

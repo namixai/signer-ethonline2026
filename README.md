@@ -91,6 +91,18 @@ find out.**
   number here, since a count in prose goes stale the moment someone adds a case, and this
   one already had.
 
+  🔴 **If you have no `make`, you are not stuck.** On a clean macOS it arrives with the
+  Xcode command line tools, and a minimal container may not have it at all — a missing
+  tool at the very first command we promise would be a poor welcome. It runs exactly
+  these four, in this order, and they need only `python3`:
+
+  ```bash
+  python3 verify_ours.py && python3 falsify.py && python3 verify_nft_ours.py && python3 falsify_nft.py
+  ```
+
+  That is the fallback, not the claim: the claim is `make verify`, and this is what it
+  does so you can run it without the tool.
+
   🔴 **This sentence has been wrong twice, so it is worth saying how it got fixed.** First
   it omitted the `cd`, and the command failed at the reader's prompt. Then it still said
   "one command" while naming two scripts — a reader counts what they type, and that was
@@ -123,6 +135,12 @@ That was true of the first path and not the second, and we corrected it rather t
 reader to discover the gap.
 
 ## Code
+
+🔴 **What this needs, so a version mismatch is not your first surprise:** `python3` for the
+offline vectors, and **Node 20 or newer** for everything under `integrations/graph` — the
+suite runs on the built-in test runner, and an older Node answers `bad option: --test`,
+which reads like our bug and is not one. CI runs Node 22. Nothing here needs a specific
+Python version beyond 3.
 
 `integrations/graph/` — the reading and verification code, written during the event window
 (2026-09-02..05) and migrated into this repository on 2026-09-07, which is why its history
