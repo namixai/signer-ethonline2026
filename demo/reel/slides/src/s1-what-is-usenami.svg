@@ -1,0 +1,47 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Usenami — a trust layer for AI agents that trade</title>
+  <desc>Exchange and wallet keys live inside an AWS Nitro Enclave. An agent can trade with them and never holds them. The policy is baked into the image, not sent with the request. Orders and cancels leave a signed receipt on both the allow and the refuse branch.</desc>
+  <defs>
+    <style>
+      .ui { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#FBFBF9"/>
+  <rect width="1920" height="8" fill="#2563EB"/>
+
+  <text class="ui" x="120" y="196" font-size="30" font-weight="600" fill="#E8971E" letter-spacing="3">USENAMI</text>
+  <text class="ui" x="120" y="292" font-size="76" font-weight="700" fill="#1A1A1A">A trust layer for agents that trade</text>
+  <text class="ui" x="120" y="356" font-size="32" fill="#6B7280">The keys stay in a sealed box. The agent trades with them and never holds them.</text>
+
+  <!-- three facts -->
+  <rect x="120" y="440" width="520" height="330" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <circle cx="172" cy="500" r="10" fill="#2563EB"/>
+  <text class="ui" x="164" y="556" font-size="34" font-weight="600" fill="#1A1A1A">The key never leaves</text>
+  <text class="ui" x="164" y="600" font-size="34" font-weight="600" fill="#1A1A1A">the enclave</text>
+  <text class="ui" x="164" y="656" font-size="26" fill="#4B5563">Not to us, not to the agent,</text>
+  <text class="ui" x="164" y="692" font-size="26" fill="#4B5563">not to the machine's operator.</text>
+
+  <rect x="700" y="440" width="520" height="330" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <circle cx="752" cy="500" r="10" fill="#E8971E"/>
+  <text class="ui" x="744" y="556" font-size="34" font-weight="600" fill="#1A1A1A">The policy is baked</text>
+  <text class="ui" x="744" y="600" font-size="34" font-weight="600" fill="#1A1A1A">into the image</text>
+  <text class="ui" x="744" y="656" font-size="26" fill="#4B5563">It arrives with the code, not</text>
+  <text class="ui" x="744" y="692" font-size="26" fill="#4B5563">with the request it judges.</text>
+
+  <rect x="1280" y="440" width="520" height="330" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <circle cx="1332" cy="500" r="10" fill="#15803D"/>
+  <text class="ui" x="1324" y="556" font-size="34" font-weight="600" fill="#1A1A1A">Every order and cancel</text>
+  <text class="ui" x="1324" y="600" font-size="34" font-weight="600" fill="#1A1A1A">leaves a receipt</text>
+  <text class="ui" x="1324" y="656" font-size="26" fill="#4B5563">Signed by the box — on the</text>
+  <text class="ui" x="1324" y="692" font-size="26" fill="#4B5563">refusal branch too.</text>
+
+  <line x1="120" y1="872" x2="1800" y2="872" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="120" y="938" font-size="32" fill="#1A1A1A">A refusal is a change of behaviour, not a log line: <tspan font-weight="600">no signature is made.</tspan></text>
+
+  <text class="ui" x="1800" y="990" font-size="40" font-weight="800" text-anchor="end">
+    <tspan fill="#1A1A1A">use</tspan><tspan fill="#2563EB">nami</tspan>
+  </text>
+  <text class="ui" x="120" y="990" font-size="24" fill="#9CA3AF">usenami.io</text>
+</svg>

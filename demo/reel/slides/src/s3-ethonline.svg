@@ -1,0 +1,50 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>What we built at ETHOnline 2026</title>
+  <desc>Two pieces. The Graph: an agent pays for a data read with x402 and gets the indexer's response back signed, which proves who answered and over which bytes — not that the answer is right. Permit2: the signing payload rebuilt from the spec and checked twice, against Uniswap's own SDK and against the deployed contract. Both run outside the enclave; there is no Permit2 signing inside the enclave yet.</desc>
+  <defs>
+    <style>
+      .ui { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#FBFBF9"/>
+  <rect width="1920" height="8" fill="#2563EB"/>
+
+  <text class="ui" x="120" y="140" font-size="58" font-weight="700" fill="#1A1A1A">What we built at ETHOnline</text>
+  <text class="ui" x="120" y="190" font-size="28" fill="#6B7280">Two pieces, both useful to the product whether or not they win anything.</text>
+
+  <!-- The Graph -->
+  <rect x="120" y="248" width="820" height="450" rx="22" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <rect x="120" y="248" width="820" height="8" rx="4" fill="#2563EB"/>
+  <text class="ui" x="168" y="336" font-size="42" font-weight="700" fill="#1A1A1A">The Graph</text>
+  <text class="ui" x="168" y="394" font-size="27" fill="#4B5563">The agent pays for a data read — no key, no</text>
+  <text class="ui" x="168" y="430" font-size="27" fill="#4B5563">account — and gets the indexer’s answer back</text>
+  <text class="ui" x="168" y="466" font-size="27" fill="#4B5563">signed.</text>
+  <rect x="168" y="500" width="724" height="52" rx="10" fill="#EFF6FF"/>
+  <text class="mono" x="190" y="534" font-size="24" fill="#1D4ED8">proves who answered, and over which bytes</text>
+  <text class="ui" x="168" y="604" font-size="27" fill="#6B7280">Not that the answer is <tspan font-style="italic">right</tspan> — that is a separate</text>
+  <text class="ui" x="168" y="640" font-size="27" fill="#6B7280">check, and four of them refuse on this data.</text>
+
+  <!-- Permit2 -->
+  <rect x="980" y="248" width="820" height="450" rx="22" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <rect x="980" y="248" width="820" height="8" rx="4" fill="#E8971E"/>
+  <text class="ui" x="1028" y="336" font-size="42" font-weight="700" fill="#1A1A1A">Uniswap Permit2</text>
+  <text class="ui" x="1028" y="394" font-size="27" fill="#4B5563">The Permit2 digest rebuilt from the spec by our</text>
+  <text class="ui" x="1028" y="430" font-size="27" fill="#4B5563">own encoder, then checked against two</text>
+  <text class="ui" x="1028" y="466" font-size="27" fill="#4B5563">independent implementations.</text>
+  <rect x="1028" y="500" width="724" height="52" rx="10" fill="#FFFBEB"/>
+  <text class="mono" x="1050" y="534" font-size="24" fill="#B45309">Uniswap’s own SDK · the deployed contract</text>
+  <text class="ui" x="1028" y="604" font-size="27" fill="#6B7280">The deployed contract has the last word: it took</text>
+  <text class="ui" x="1028" y="640" font-size="27" fill="#6B7280">our digest and rejected the mis-ordered one.</text>
+
+  <!-- boundary -->
+  <rect x="120" y="746" width="1680" height="150" rx="20" fill="#FFFBEB" stroke="#E8971E" stroke-width="3"/>
+  <text class="ui" x="168" y="816" font-size="36" font-weight="700" fill="#B45309">Both of these run outside the enclave.</text>
+  <text class="ui" x="168" y="864" font-size="30" fill="#4B5563">There is no Permit2 signing inside the enclave — not yet. We are not claiming otherwise.</text>
+
+  <text class="ui" x="120" y="990" font-size="24" fill="#9CA3AF">usenami.io</text>
+  <text class="ui" x="1800" y="990" font-size="40" font-weight="800" text-anchor="end">
+    <tspan fill="#1A1A1A">use</tspan><tspan fill="#2563EB">nami</tspan>
+  </text>
+</svg>

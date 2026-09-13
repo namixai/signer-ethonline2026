@@ -87,15 +87,24 @@ So read `plans/prompts/` as three real records, not as the complete set of direc
 would rather hand a judge that sentence than a directory that quietly implies completeness.
 
 **Which parts are AI-written, concretely, since the rule asks for files rather than
-areas.** Effectively all of it. This repository tracks 100 files. Ninety-nine of them —
-everything under `integrations/`, `vectors/`, `demo/`, `specs/`, `plans/`, `scripts/`
-and `.github/`, every Markdown document at the top level including this one, and
-`.gitignore` — were written by Claude Code sessions. The hundredth is `LICENSE`, which
-is the Apache License 2.0 verbatim and nobody's authorship. There is no hand-written
-module hiding in here, and no file where a human typed the code and a model typed the
-comments. What a human did is the list at the top of this file — scope, tracks,
-publication, spending — plus the arguing: the corrections marked 🔴 throughout these
-documents exist because a claim was challenged, not because a model noticed on its own.
+areas.** Effectively all of it. Through 12 September this repository tracked 100 files.
+Ninety-nine of them — everything under `integrations/`, `vectors/`, `demo/`, `specs/`,
+`plans/`, `scripts/` and `.github/`, every Markdown document at the top level including
+this one, and `.gitignore` — were written by Claude Code sessions. The hundredth is
+`LICENSE`, which is the Apache License 2.0 verbatim and nobody's authorship. There is no
+hand-written module hiding in here, and no file where a human typed the code and a model
+typed the comments. What a human did is the list at the top of this file — scope,
+tracks, publication, spending — plus the arguing: the corrections marked 🔴 throughout
+these documents exist because a claim was challenged, not because a model noticed on its
+own.
+
+🔴 **It tracks 108 as of 13 September, and the eight new files get their own sentence.**
+`demo/reel/` gained a step runner, a balance reader and three slides with their SVG
+sources. They were written on the machine the video is being filmed on and committed
+here as found: this file counted them and did not measure who typed them, which is
+duller than folding them into the ninety-nine and is the only version of the sentence it
+can stand behind. None of the eight is product code — the runner invokes commands that
+were already in this repository, and the reader makes one `balanceOf` call.
 
 ## Honest note about the boundary
 
