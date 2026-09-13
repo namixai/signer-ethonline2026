@@ -87,9 +87,9 @@ So read `plans/prompts/` as three real records, not as the complete set of direc
 would rather hand a judge that sentence than a directory that quietly implies completeness.
 
 **Which parts are AI-written — and whether that means a model built the project.** The
-condition attached to the allowance is "don't let it build the project for you", so that
-is the half answered first here. The file count comes underneath it, because a count
-answers a narrower question than the rule asks.
+condition attached to the allowance is "don't let it build the project for you", so this
+file answers that half first. The file count comes underneath it, because a count answers
+a narrower question than the rule asks.
 
 **The thing being submitted is older than the event.** The signing path this submission
 points at — a key generated inside the enclave, and a cap applied in the enclave before
