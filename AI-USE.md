@@ -100,11 +100,12 @@ own.
 
 🔴 **It tracks 108 as of 13 September, and the eight new files get their own sentence.**
 `demo/reel/` gained a step runner, a balance reader and three slides with their SVG
-sources. They were written on the machine the video is being filmed on and committed
-here as found: this file counted them and did not measure who typed them, which is
-duller than folding them into the ninety-nine and is the only version of the sentence it
-can stand behind. None of the eight is product code — the runner invokes commands that
-were already in this repository, and the reader makes one `balanceOf` call.
+sources. They were found as untracked files in the checkout the video is being filmed
+from and committed here as they were: this file counted them and did not measure who
+typed them, which is duller than folding them into the ninety-nine and is the only
+version of the sentence it can stand behind. None of the eight is product code — the
+runner invokes commands that were already in this repository, and the reader makes one
+`balanceOf` call.
 
 ## Honest note about the boundary
 

@@ -344,19 +344,22 @@ thirty-seven `integrations/graph/README.md`, which documents the code this submi
 calls its window work, and `demo/STORYBOARD-hyperliquid.md`. `demo/precheck.sh` prints
 in Russian, and so do both scripts under `demo/reel/`; `npm run test:offline` gives
 Russian reasons for the six tests it skips, beside their English names. Do not take the
-number on trust — it is every tracked file holding a Cyrillic character, and it moves as
-files are added:
+number on trust — it is every tracked file that decodes as UTF-8 and holds a Cyrillic
+character, and it names what it skipped, so the number cannot quietly hide a binary:
 
 ```bash
 git ls-files | grep -v node_modules | python3 -c "
 import pathlib, re, sys
 cyr = re.compile(r'[\u0400-\u04FF]')
-def russian(f):
+hits, skipped = 0, []
+for f in sys.stdin.read().split():
     try:
-        return bool(cyr.search(pathlib.Path(f).read_text(encoding='utf-8')))
+        text = pathlib.Path(f).read_text(encoding='utf-8')
     except UnicodeDecodeError:
-        return False          # not text at all — the slides in demo/reel are PNGs
-print(sum(1 for f in sys.stdin.read().split() if russian(f)))"
+        skipped.append(f)        # not text at all — the slides in demo/reel are PNGs
+        continue
+    hits += cyr.search(text) is not None
+print(hits, 'files with Russian;', len(skipped), 'not text:', *skipped)"
 ```
 
 (Python rather than `grep -P`, because the `grep` shipped with macOS has no `-P` and would
