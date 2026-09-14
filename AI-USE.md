@@ -86,16 +86,53 @@ person whose project this is, not something a model session gets to make on its 
 So read `plans/prompts/` as three real records, not as the complete set of direction. We
 would rather hand a judge that sentence than a directory that quietly implies completeness.
 
-**Which parts are AI-written, concretely, since the rule asks for files rather than
-areas.** Effectively all of it. This repository tracks 100 files. Ninety-nine of them —
-everything under `integrations/`, `vectors/`, `demo/`, `specs/`, `plans/`, `scripts/`
-and `.github/`, every Markdown document at the top level including this one, and
-`.gitignore` — were written by Claude Code sessions. The hundredth is `LICENSE`, which
-is the Apache License 2.0 verbatim and nobody's authorship. There is no hand-written
-module hiding in here, and no file where a human typed the code and a model typed the
-comments. What a human did is the list at the top of this file — scope, tracks,
-publication, spending — plus the arguing: the corrections marked 🔴 throughout these
-documents exist because a claim was challenged, not because a model noticed on its own.
+**Which parts are AI-written — and whether that means a model built the project.** The
+condition attached to the allowance is "don't let it build the project for you", so this
+file answers that half first. The file count comes underneath it, because a count answers
+a narrower question than the rule asks.
+
+**The thing being submitted is older than the event.** The signing path this submission
+points at — a key generated inside the enclave, and a cap applied in the enclave before
+signing rather than checked after — was exercised on live venues before ETHOnline
+opened. On 16 August the enclave signed an order Hyperliquid accepted, and the cancel
+was accepted too; the same policy that morning signed 0.010 BNB under its 0.041 cap and
+refused 0.050 with `policy_denied`. Two of the three venues have a completed round trip
+behind them, on 27 July and 19 August; the third has a signed order that was accepted
+into the book and cancelled, never executed. `CONTINUITY.md` is the
+component-by-component version of that, with dates, and it marks which rows predate the
+window, which were cut during it, and which were written after 4 September — including
+the ones where the window produced less than the plan promised. Nine days did not build
+that, and nothing here claims they did.
+
+**What the human decided, and what he argued with.** Scope: what gets built and what
+gets refused. Which prize tracks to enter. What may be said in public, including every
+claim in this file. And the money — every payment behind the measurements in this
+repository was made by hand, by him, after being shown the amount. Then the part that
+leaves no trace in a commit count: the arguing. Every correction marked 🔴 in these
+documents is there because a claim was challenged and did not survive the challenge, not
+because a model noticed on its own. This file carries such marks in three places — the
+correction near the top, the September task orders that are not in this repository, and
+the file count below — and the largest of them threw out two sentences it had been
+carrying since it was created: "every pull request is reviewed and merged by a human",
+and the one crediting two automated reviewers. Neither survived the first check anyone
+would run.
+
+**The measurement, since the rule asks for files rather than areas.** Through 12
+September this repository tracked 100 files. Ninety-nine of them — everything under
+`integrations/`, `vectors/`, `demo/`, `specs/`, `plans/`, `scripts/` and `.github/`,
+every Markdown document at the top level including this one, and `.gitignore` — were
+written by Claude Code sessions. The hundredth is `LICENSE`, which is the Apache License
+2.0 verbatim and nobody's authorship. There is no hand-written module hiding in here,
+and no file where a human typed the code and a model typed the comments.
+
+🔴 **It tracks 108 as of 13 September, and the eight new files get their own sentence.**
+`demo/reel/` gained a step runner, a balance reader and three slides with their SVG
+sources. They were found as untracked files in the checkout the video is being filmed
+from and committed here as they were: this file counted them and did not measure who
+typed them, which is duller than folding them into the ninety-nine and is the only
+version of the sentence it can stand behind. None of the eight is product code — the
+runner invokes commands that were already in this repository, and the reader makes one
+`balanceOf` call.
 
 ## Honest note about the boundary
 

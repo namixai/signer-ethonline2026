@@ -1,0 +1,78 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>How it works, and how you check it without us</title>
+  <desc>An agent brings a ready order. The enclave checks it against the owner's policy and either signs it inside the policy or refuses without making a signature. Below: the hardware measures the running code, that measurement is registered in a public registry on Base, and anyone can rebuild the image from the public source and compare it themselves.</desc>
+  <defs>
+    <style>
+      .ui { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+    </style>
+    <marker id="a" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 1 L 11 6 L 0 11 z" fill="#9CA3AF"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 1 L 11 6 L 0 11 z" fill="#15803D"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 1 L 11 6 L 0 11 z" fill="#B45309"/>
+    </marker>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#FBFBF9"/>
+  <rect width="1920" height="8" fill="#2563EB"/>
+
+  <text class="ui" x="120" y="140" font-size="58" font-weight="700" fill="#1A1A1A">How it works</text>
+  <text class="ui" x="120" y="190" font-size="28" fill="#6B7280">One decision, two outcomes — and neither of them is “trust us”.</text>
+
+  <!-- flow -->
+  <rect x="120" y="248" width="360" height="190" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="160" y="318" font-size="36" font-weight="600" fill="#1A1A1A">Agent</text>
+  <text class="ui" x="160" y="364" font-size="25" fill="#4B5563">brings a ready order:</text>
+  <text class="ui" x="160" y="398" font-size="25" fill="#4B5563">venue, action, size</text>
+
+  <line x1="496" y1="343" x2="600" y2="343" stroke="#9CA3AF" stroke-width="4" marker-end="url(#a)"/>
+
+  <rect x="620" y="228" width="520" height="230" rx="20" fill="#FFFFFF" stroke="#2563EB" stroke-width="3"/>
+  <text class="ui" x="664" y="300" font-size="38" font-weight="700" fill="#1A1A1A">Enclave</text>
+  <text class="ui" x="664" y="346" font-size="25" fill="#4B5563">checks the order against the</text>
+  <text class="ui" x="664" y="380" font-size="25" fill="#4B5563">owner’s policy</text>
+  <rect x="664" y="400" width="432" height="40" rx="8" fill="#EFF6FF"/>
+  <text class="mono" x="682" y="428" font-size="22" fill="#1D4ED8">policy baked in, not passed in</text>
+
+  <line x1="1156" y1="300" x2="1268" y2="300" stroke="#15803D" stroke-width="4" marker-end="url(#ag)"/>
+  <line x1="1156" y1="392" x2="1268" y2="392" stroke="#B45309" stroke-width="4" marker-end="url(#ar)"/>
+
+  <rect x="1288" y="242" width="512" height="112" rx="18" fill="#F0FDF4" stroke="#BBF7D0" stroke-width="2"/>
+  <text class="ui" x="1328" y="298" font-size="34" font-weight="600" fill="#15803D">Signs</text>
+  <text class="ui" x="1328" y="334" font-size="24" fill="#4B5563">inside the policy</text>
+
+  <rect x="1288" y="374" width="512" height="112" rx="18" fill="#FFFBEB" stroke="#FDE68A" stroke-width="2"/>
+  <text class="ui" x="1328" y="430" font-size="34" font-weight="600" fill="#B45309">Refuses</text>
+  <text class="ui" x="1328" y="466" font-size="24" fill="#4B5563">no signature is made</text>
+
+  <!-- verification strip -->
+  <line x1="120" y1="566" x2="1800" y2="566" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="120" y="642" font-size="40" font-weight="700" fill="#1A1A1A">And you check the box itself — without asking us</text>
+
+  <rect x="120" y="686" width="520" height="230" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="164" y="748" font-size="26" font-weight="700" fill="#2563EB">1</text>
+  <text class="ui" x="164" y="800" font-size="32" font-weight="600" fill="#1A1A1A">Hardware measures</text>
+  <text class="ui" x="164" y="850" font-size="25" fill="#4B5563">AWS signs a measurement of</text>
+  <text class="ui" x="164" y="884" font-size="25" fill="#4B5563">the exact code running — not us.</text>
+
+  <rect x="700" y="686" width="520" height="230" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="744" y="748" font-size="26" font-weight="700" fill="#2563EB">2</text>
+  <text class="ui" x="744" y="800" font-size="32" font-weight="600" fill="#1A1A1A">The chain records it</text>
+  <text class="ui" x="744" y="850" font-size="25" fill="#4B5563">That measurement sits in a</text>
+  <text class="ui" x="744" y="884" font-size="25" fill="#4B5563">public registry on Base.</text>
+
+  <rect x="1280" y="686" width="520" height="230" rx="20" fill="#FFFFFF" stroke="#E4E4E0" stroke-width="2"/>
+  <text class="ui" x="1324" y="748" font-size="26" font-weight="700" fill="#2563EB">3</text>
+  <text class="ui" x="1324" y="800" font-size="32" font-weight="600" fill="#1A1A1A">Anyone rebuilds it</text>
+  <text class="ui" x="1324" y="850" font-size="25" fill="#4B5563">Clone the public source, rebuild,</text>
+  <text class="ui" x="1324" y="884" font-size="25" fill="#4B5563">compare. No account needed.</text>
+
+  <text class="ui" x="120" y="990" font-size="27" fill="#1A1A1A">A chain is as strong as its weakest link — <tspan font-weight="600">not as the link we quote.</tspan></text>
+  <text class="ui" x="1800" y="990" font-size="40" font-weight="800" text-anchor="end">
+    <tspan fill="#1A1A1A">use</tspan><tspan fill="#2563EB">nami</tspan>
+  </text>
+</svg>

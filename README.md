@@ -317,6 +317,18 @@ be wrong sooner or later. The frame explains both readings when you run it. The 
 sequence is in
 `demo/STORYBOARD-hyperliquid.md`.
 
+The recording tooling sits in `demo/reel/`. `step.sh` runs the four commands this file
+already gives you — the Graph walkthrough, `make verify`, `onchain_fieldorder.mjs` and
+frame 3 — one at a time, waiting for an Enter between them. The point is pacing: the
+rules forbid speeding the video up, so silence in the middle of a take has to be avoided
+rather than compressed afterwards. It checks nothing of its own and proves nothing of
+its own; what it adds is that a non-zero exit stops it, instead of letting a voiceover
+talk past a step that failed. `balance.sh` beside it reads a USDC balance on Base
+through `balanceOf` and needs `X402_PAYER` set to the paying address — with that
+variable unset it refuses rather than print some other wallet, and an empty answer from
+the chain is reported as unknown rather than as zero. `demo/reel/slides/` holds the
+three title cards and their SVG sources.
+
 ## Specs
 
 | file | what it settles |
@@ -326,24 +338,40 @@ sequence is in
 | `specs/SPEC-uniswap-signature-surfaces.md` | What else gets a typed-data signature in the router path besides Permit2 — three commands that do, and one nested path that does even when the top-level call doesn't |
 | `specs/SPEC-enclave-guarantee-boundary.md` | What the enclave does not promise: price, MEV, slippage |
 
-🔴 **Russian, and not only here.** As of 12 September, **39 tracked files in this
+🔴 **Russian, and not only here.** As of 13 September, **41 tracked files in this
 repository contain Russian** — the four specs above among them, and among the other
-thirty-five `integrations/graph/README.md`, which documents the code this submission calls
-its window work, and `demo/STORYBOARD-hyperliquid.md`. `demo/precheck.sh` prints in
-Russian, and `npm run test:offline` gives Russian reasons for the six tests it skips,
-beside their English names. Do not take the number on trust — it is every tracked file
-holding a Cyrillic character, and it moves as files are added:
+thirty-seven `integrations/graph/README.md`, which documents the code this submission
+calls its window work, and `demo/STORYBOARD-hyperliquid.md`. `demo/precheck.sh` prints
+in Russian, and so do both scripts under `demo/reel/`; `npm run test:offline` gives
+Russian reasons for the six tests it skips, beside their English names. Do not take the
+number on trust — it is every tracked file that decodes as UTF-8 and holds a Cyrillic
+character, and it names what it skipped, so the number cannot quietly hide a binary:
 
 ```bash
 git ls-files | grep -v node_modules | python3 -c "
 import pathlib, re, sys
 cyr = re.compile(r'[\u0400-\u04FF]')
-print(sum(1 for f in sys.stdin.read().split()
-          if cyr.search(pathlib.Path(f).read_text(errors='ignore'))))"
+hits, skipped = 0, []
+for f in sys.stdin.read().split():
+    try:
+        text = pathlib.Path(f).read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        skipped.append(f)        # not text at all — the slides in demo/reel are PNGs
+        continue
+    hits += cyr.search(text) is not None
+print(hits, 'files with Russian;', len(skipped), 'not text:', *skipped)"
 ```
 
 (Python rather than `grep -P`, because the `grep` shipped with macOS has no `-P` and would
 answer `invalid option` rather than a number. Checked on both.)
+
+🔴 **That command changed on 13 September, and the reason is the more useful half.** It
+used to decode every file with `errors='ignore'`, which is harmless right up until a
+repository of text gains its first binaries: the three PNGs under `demo/reel/slides/`
+decode into characters that include Cyrillic, so the old command answered 44 where the
+count of files actually holding Russian is 41. It now decodes strictly and skips whatever
+is not text. Two of the eight files added that day do contain Russian, which is why the
+number moved 39 → 41 rather than standing still.
 
 This paragraph has now been wrong twice, in the same direction both times. It first said
 "all four are in Russian", which reads as a complete inventory and was not one; the
